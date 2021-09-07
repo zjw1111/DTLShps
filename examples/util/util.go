@@ -58,6 +58,10 @@ func Chat(conn io.ReadWriter) {
 
 // Check is a helper to throw errors in the examples
 func Check(err error) {
+	if err == io.EOF {
+		fmt.Println("exit with EOF")
+		os.Exit(0)
+	}
 	switch e := err.(type) {
 	case nil:
 	case (net.Error):
