@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"hash"
 
-	"github.com/pion/dtls/v2/internal/ciphersuite"
-	"github.com/pion/dtls/v2/pkg/crypto/clientcertificate"
-	"github.com/pion/dtls/v2/pkg/protocol/recordlayer"
+	"github.com/zjw1111/DTLShps/internal/ciphersuite"
+	"github.com/zjw1111/DTLShps/pkg/crypto/clientcertificate"
+	"github.com/zjw1111/DTLShps/pkg/protocol/recordlayer"
 )
 
 // CipherSuiteID is an ID for our supported CipherSuites

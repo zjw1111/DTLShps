@@ -2,8 +2,8 @@
 package handshake
 
 import (
-	"github.com/pion/dtls/v2/internal/util"
-	"github.com/pion/dtls/v2/pkg/protocol"
+	"github.com/zjw1111/DTLShps/internal/util"
+	"github.com/zjw1111/DTLShps/pkg/protocol"
 )
 
 // Type is the unique identifier for each handshake message

@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pion/dtls/v2/pkg/crypto/signaturehash"
-	"github.com/pion/dtls/v2/pkg/protocol/alert"
-	"github.com/pion/dtls/v2/pkg/protocol/handshake"
 	"github.com/pion/logging"
+	"github.com/zjw1111/DTLShps/pkg/crypto/signaturehash"
+	"github.com/zjw1111/DTLShps/pkg/protocol/alert"
+	"github.com/zjw1111/DTLShps/pkg/protocol/handshake"
 )
 
 // [RFC6347 Section-4.2.4]

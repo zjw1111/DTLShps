@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v2"
+	dtls "github.com/zjw1111/DTLShps"
 )
 
 func serverOpenSSL(c *comm) {

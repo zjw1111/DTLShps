@@ -10,8 +10,8 @@ import ( //nolint:gci
 	"hash"
 	"math"
 
-	"github.com/pion/dtls/v2/pkg/crypto/elliptic"
-	"github.com/pion/dtls/v2/pkg/protocol"
+	"github.com/zjw1111/DTLShps/pkg/crypto/elliptic"
+	"github.com/zjw1111/DTLShps/pkg/protocol"
 	"golang.org/x/crypto/curve25519"
 )
 

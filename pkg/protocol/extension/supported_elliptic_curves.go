@@ -3,7 +3,7 @@ package extension
 import (
 	"encoding/binary"
 
-	"github.com/pion/dtls/v2/pkg/crypto/elliptic"
+	"github.com/zjw1111/DTLShps/pkg/crypto/elliptic"
 )
 
 const (

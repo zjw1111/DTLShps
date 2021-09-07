@@ -1,9 +1,9 @@
 package dtls
 
 import (
-	"github.com/pion/dtls/v2/pkg/protocol"
-	"github.com/pion/dtls/v2/pkg/protocol/handshake"
-	"github.com/pion/dtls/v2/pkg/protocol/recordlayer"
+	"github.com/zjw1111/DTLShps/pkg/protocol"
+	"github.com/zjw1111/DTLShps/pkg/protocol/handshake"
+	"github.com/zjw1111/DTLShps/pkg/protocol/recordlayer"
 )
 
 type fragment struct {

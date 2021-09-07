@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pion/dtls/v2/pkg/protocol"
+	"github.com/zjw1111/DTLShps/pkg/protocol"
 )
 
 func TestUDPDecode(t *testing.T) {

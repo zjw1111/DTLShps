@@ -10,17 +10,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pion/dtls/v2/internal/closer"
-	"github.com/pion/dtls/v2/pkg/crypto/elliptic"
-	"github.com/pion/dtls/v2/pkg/crypto/signaturehash"
-	"github.com/pion/dtls/v2/pkg/protocol"
-	"github.com/pion/dtls/v2/pkg/protocol/alert"
-	"github.com/pion/dtls/v2/pkg/protocol/handshake"
-	"github.com/pion/dtls/v2/pkg/protocol/recordlayer"
 	"github.com/pion/logging"
 	"github.com/pion/transport/connctx"
 	"github.com/pion/transport/deadline"
 	"github.com/pion/transport/replaydetector"
+	"github.com/zjw1111/DTLShps/internal/closer"
+	"github.com/zjw1111/DTLShps/pkg/crypto/elliptic"
+	"github.com/zjw1111/DTLShps/pkg/crypto/signaturehash"
+	"github.com/zjw1111/DTLShps/pkg/protocol"
+	"github.com/zjw1111/DTLShps/pkg/protocol/alert"
+	"github.com/zjw1111/DTLShps/pkg/protocol/handshake"
+	"github.com/zjw1111/DTLShps/pkg/protocol/recordlayer"
 )
 
 const (

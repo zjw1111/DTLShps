@@ -7,9 +7,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/pion/dtls/v2"
-	"github.com/pion/dtls/v2/examples/util"
-	"github.com/pion/dtls/v2/pkg/crypto/selfsign"
+	dtls "github.com/zjw1111/DTLShps"
+	"github.com/zjw1111/DTLShps/examples/util"
+	"github.com/zjw1111/DTLShps/pkg/crypto/selfsign"
 )
 
 func main() {

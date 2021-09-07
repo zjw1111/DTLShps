@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v2/internal/net/dpipe"
-	"github.com/pion/dtls/v2/pkg/crypto/selfsign"
 	"github.com/pion/logging"
 	"github.com/pion/transport/test"
+	"github.com/zjw1111/DTLShps/internal/net/dpipe"
+	"github.com/zjw1111/DTLShps/pkg/crypto/selfsign"
 )
 
 func TestSimpleReadWrite(t *testing.T) {

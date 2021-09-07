@@ -3,9 +3,9 @@ package dtls
 import (
 	"net"
 
-	"github.com/pion/dtls/v2/pkg/protocol"
-	"github.com/pion/dtls/v2/pkg/protocol/recordlayer"
 	"github.com/pion/udp"
+	"github.com/zjw1111/DTLShps/pkg/protocol"
+	"github.com/zjw1111/DTLShps/pkg/protocol/recordlayer"
 )
 
 // Listen creates a DTLS listener

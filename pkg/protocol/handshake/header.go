@@ -3,7 +3,7 @@ package handshake
 import (
 	"encoding/binary"
 
-	"github.com/pion/dtls/v2/internal/util"
+	"github.com/zjw1111/DTLShps/internal/util"
 )
 
 // HeaderLength msg_len for Handshake messages assumes an extra

@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v2"
-	"github.com/pion/dtls/v2/pkg/crypto/selfsign"
 	"github.com/pion/transport/test"
+	dtls "github.com/zjw1111/DTLShps"
+	"github.com/zjw1111/DTLShps/pkg/crypto/selfsign"
 )
 
 // ED25519 is not supported in Go 1.12 crypto/x509.

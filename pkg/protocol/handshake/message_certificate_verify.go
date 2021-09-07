@@ -3,8 +3,8 @@ package handshake
 import (
 	"encoding/binary"
 
-	"github.com/pion/dtls/v2/pkg/crypto/hash"
-	"github.com/pion/dtls/v2/pkg/crypto/signature"
+	"github.com/zjw1111/DTLShps/pkg/crypto/hash"
+	"github.com/zjw1111/DTLShps/pkg/crypto/signature"
 )
 
 // MessageCertificateVerify provide explicit verification of a

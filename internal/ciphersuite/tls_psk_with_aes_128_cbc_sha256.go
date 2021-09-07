@@ -6,10 +6,10 @@ import (
 	"hash"
 	"sync/atomic"
 
-	"github.com/pion/dtls/v2/pkg/crypto/ciphersuite"
-	"github.com/pion/dtls/v2/pkg/crypto/clientcertificate"
-	"github.com/pion/dtls/v2/pkg/crypto/prf"
-	"github.com/pion/dtls/v2/pkg/protocol/recordlayer"
+	"github.com/zjw1111/DTLShps/pkg/crypto/ciphersuite"
+	"github.com/zjw1111/DTLShps/pkg/crypto/clientcertificate"
+	"github.com/zjw1111/DTLShps/pkg/crypto/prf"
+	"github.com/zjw1111/DTLShps/pkg/protocol/recordlayer"
 )
 
 // TLSPskWithAes128CbcSha256 implements the TLS_PSK_WITH_AES_128_CBC_SHA256 CipherSuite

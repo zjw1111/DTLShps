@@ -6,10 +6,10 @@ import (
 	"hash"
 	"sync/atomic"
 
-	"github.com/pion/dtls/v2/pkg/crypto/ciphersuite"
-	"github.com/pion/dtls/v2/pkg/crypto/clientcertificate"
-	"github.com/pion/dtls/v2/pkg/crypto/prf"
-	"github.com/pion/dtls/v2/pkg/protocol/recordlayer"
+	"github.com/zjw1111/DTLShps/pkg/crypto/ciphersuite"
+	"github.com/zjw1111/DTLShps/pkg/crypto/clientcertificate"
+	"github.com/zjw1111/DTLShps/pkg/crypto/prf"
+	"github.com/zjw1111/DTLShps/pkg/protocol/recordlayer"
 )
 
 // TLSEcdheEcdsaWithAes128GcmSha256  represents a TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 CipherSuite

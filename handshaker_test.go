@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v2/pkg/crypto/selfsign"
-	"github.com/pion/dtls/v2/pkg/crypto/signaturehash"
-	"github.com/pion/dtls/v2/pkg/protocol/alert"
-	"github.com/pion/dtls/v2/pkg/protocol/handshake"
-	"github.com/pion/dtls/v2/pkg/protocol/recordlayer"
 	"github.com/pion/logging"
 	"github.com/pion/transport/test"
+	"github.com/zjw1111/DTLShps/pkg/crypto/selfsign"
+	"github.com/zjw1111/DTLShps/pkg/crypto/signaturehash"
+	"github.com/zjw1111/DTLShps/pkg/protocol/alert"
+	"github.com/zjw1111/DTLShps/pkg/protocol/handshake"
+	"github.com/zjw1111/DTLShps/pkg/protocol/recordlayer"
 )
 
 const nonZeroRetransmitInterval = 100 * time.Millisecond

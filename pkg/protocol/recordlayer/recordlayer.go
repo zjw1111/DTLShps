@@ -3,9 +3,9 @@ package recordlayer
 import (
 	"encoding/binary"
 
-	"github.com/pion/dtls/v2/pkg/protocol"
-	"github.com/pion/dtls/v2/pkg/protocol/alert"
-	"github.com/pion/dtls/v2/pkg/protocol/handshake"
+	"github.com/zjw1111/DTLShps/pkg/protocol"
+	"github.com/zjw1111/DTLShps/pkg/protocol/alert"
+	"github.com/zjw1111/DTLShps/pkg/protocol/handshake"
 )
 
 // RecordLayer which handles all data transport.

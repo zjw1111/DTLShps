@@ -13,8 +13,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/pion/dtls/v2/pkg/crypto/elliptic"
-	"github.com/pion/dtls/v2/pkg/crypto/hash"
+	"github.com/zjw1111/DTLShps/pkg/crypto/elliptic"
+	"github.com/zjw1111/DTLShps/pkg/crypto/hash"
 )
 
 type ecdsaSignature struct {

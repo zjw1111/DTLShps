@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pion/dtls/v2/pkg/crypto/selfsign"
+	"github.com/zjw1111/DTLShps/pkg/crypto/selfsign"
 )
 
 func TestGetCertificate(t *testing.T) {

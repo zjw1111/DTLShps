@@ -3,7 +3,7 @@ package hash
 import (
 	"testing"
 
-	"github.com/pion/dtls/v2/pkg/crypto/fingerprint"
+	"github.com/zjw1111/DTLShps/pkg/crypto/fingerprint"
 )
 
 func TestHashAlgorithm_StringRoundtrip(t *testing.T) {

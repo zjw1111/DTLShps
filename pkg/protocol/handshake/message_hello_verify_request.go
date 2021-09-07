@@ -1,7 +1,7 @@
 package handshake
 
 import (
-	"github.com/pion/dtls/v2/pkg/protocol"
+	"github.com/zjw1111/DTLShps/pkg/protocol"
 )
 
 // MessageHelloVerifyRequest is as follows:

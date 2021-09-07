@@ -1,7 +1,7 @@
 package handshake
 
 import (
-	"github.com/pion/dtls/v2/internal/util"
+	"github.com/zjw1111/DTLShps/internal/util"
 )
 
 // MessageCertificate is a DTLS Handshake Message

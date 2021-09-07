@@ -3,11 +3,11 @@ package dtls
 import (
 	"context"
 
-	"github.com/pion/dtls/v2/pkg/crypto/prf"
-	"github.com/pion/dtls/v2/pkg/protocol"
-	"github.com/pion/dtls/v2/pkg/protocol/alert"
-	"github.com/pion/dtls/v2/pkg/protocol/handshake"
-	"github.com/pion/dtls/v2/pkg/protocol/recordlayer"
+	"github.com/zjw1111/DTLShps/pkg/crypto/prf"
+	"github.com/zjw1111/DTLShps/pkg/protocol"
+	"github.com/zjw1111/DTLShps/pkg/protocol/alert"
+	"github.com/zjw1111/DTLShps/pkg/protocol/handshake"
+	"github.com/zjw1111/DTLShps/pkg/protocol/recordlayer"
 )
 
 func flight6Parse(ctx context.Context, c flightConn, state *State, cache *handshakeCache, cfg *handshakeConfig) (flightVal, *alert.Alert, error) {

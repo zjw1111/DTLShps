@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v2/pkg/crypto/selfsign"
 	"github.com/pion/transport/test"
+	"github.com/zjw1111/DTLShps/pkg/crypto/selfsign"
 )
 
 var errMessageMissmatch = errors.New("messages missmatch")
