@@ -20,11 +20,10 @@ func main() {
 	// Everything below is the pion-DTLS API! Thanks for using it ❤️.
 	//
 
-	certificate, err := util.LoadKeyAndCertificate("examples/certificates/client.pem",
-		"examples/certificates/client.pub.pem")
+	certificate, err := util.LoadKeyAndCertificate("cert/client.pem", "cert/client.pub.crt")
 	util.Check(err)
 
-	rootCertificate, err := util.LoadCertificate("examples/certificates/server.pub.pem")
+	rootCertificate, err := util.LoadCertificate("cert/CA.crt")
 	util.Check(err)
 	certPool := x509.NewCertPool()
 	cert, err := x509.ParseCertificate(rootCertificate.Certificate[0])
@@ -36,6 +35,7 @@ func main() {
 		Certificates:         []tls.Certificate{*certificate},
 		ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
 		RootCAs:              certPool,
+		ServerName:           "server", // ServerName must be the same as 'subject: CN' in server's cert
 	}
 
 	// Connect to a DTLS server
