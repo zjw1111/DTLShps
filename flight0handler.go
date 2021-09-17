@@ -64,6 +64,8 @@ func flight0Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 			}
 		case *extension.ServerName:
 			state.serverName = e.ServerName // remote server name
+		case *extension.EncryptedKey:
+			cfg.log.Infof("extension.EncryptedKey: %s\n", e.EncryptedKey)
 		}
 	}
 
@@ -79,7 +81,12 @@ func flight0Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		}
 	}
 
-	return flight2, nil, nil
+	// modify for skip HelloVerifyRequest (flight2 and flight3)
+	if cfg.DTLShps || cfg.SkipHelloVerify {
+		return flight4, nil, nil
+	} else {
+		return flight2, nil, nil
+	}
 }
 
 func flight0Generate(c flightConn, state *State, cache *handshakeCache, cfg *handshakeConfig) ([]*packet, *alert.Alert, error) {

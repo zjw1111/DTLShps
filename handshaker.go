@@ -89,6 +89,7 @@ type handshakeFSM struct {
 
 type handshakeConfig struct {
 	DTLShps                     bool
+	SkipHelloVerify             bool
 	localPSKCallback            PSKCallback
 	localPSKIdentityHint        []byte
 	localCipherSuites           []CipherSuite             // Available CipherSuites

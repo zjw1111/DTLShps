@@ -104,7 +104,10 @@ func createConn(ctx context.Context, nextConn net.Conn, config *Config, isClient
 
 	loggerFactory := config.LoggerFactory
 	if loggerFactory == nil {
-		loggerFactory = logging.NewDefaultLoggerFactory()
+		// 添加环境变量 PION_LOG_TRACE=dtls PION_LOG_DEBUG=dtls ... 可以动态设置log输出级别
+		// 或者构造logger的时候把level写死
+		// loggerFactory = logging.NewDefaultLoggerFactory()
+		loggerFactory = &logging.DefaultLoggerFactory{DefaultLogLevel: logging.LogLevelInfo}
 	}
 
 	logger := loggerFactory.NewLogger("dtls")
@@ -160,6 +163,8 @@ func createConn(ctx context.Context, nextConn net.Conn, config *Config, isClient
 	}
 
 	hsCfg := &handshakeConfig{
+		DTLShps:                     config.DTLShps,
+		SkipHelloVerify:             config.SkipHelloVerify,
 		localPSKCallback:            config.PSK,
 		localPSKIdentityHint:        config.PSKIdentityHint,
 		localCipherSuites:           cipherSuites,
