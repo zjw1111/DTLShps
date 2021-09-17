@@ -16,6 +16,7 @@ const (
 	SupportedSignatureAlgorithmsTypeValue TypeValue = 13
 	UseSRTPTypeValue                      TypeValue = 14
 	UseExtendedMasterSecretTypeValue      TypeValue = 23
+	EncryptedKeyTypeValue                 TypeValue = 30
 	RenegotiationInfoTypeValue            TypeValue = 65281
 )
 
@@ -66,6 +67,8 @@ func Unmarshal(buf []byte) ([]Extension, error) {
 			err = unmarshalAndAppend(buf[offset:], &UseExtendedMasterSecret{})
 		case RenegotiationInfoTypeValue:
 			err = unmarshalAndAppend(buf[offset:], &RenegotiationInfo{})
+		case EncryptedKeyTypeValue:
+			err = unmarshalAndAppend(buf[offset:], &EncryptedKey{})
 		default:
 		}
 		if err != nil {

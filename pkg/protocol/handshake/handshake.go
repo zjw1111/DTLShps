@@ -23,6 +23,8 @@ const (
 	TypeCertificateVerify  Type = 15
 	TypeClientKeyExchange  Type = 16
 	TypeFinished           Type = 20
+	TypeEncryptedKey       Type = 31
+	TypeIdentity           Type = 32
 )
 
 // String returns the string representation of this type
@@ -50,6 +52,10 @@ func (t Type) String() string {
 		return "ClientKeyExchange"
 	case TypeFinished:
 		return "Finished"
+	case TypeEncryptedKey:
+		return "EncryptedKey"
+	case TypeIdentity:
+		return "Identity"
 	}
 	return ""
 }
@@ -138,6 +144,10 @@ func (h *Handshake) Unmarshal(data []byte) error {
 		h.Message = &MessageFinished{}
 	case TypeCertificateVerify:
 		h.Message = &MessageCertificateVerify{}
+	case TypeEncryptedKey:
+		h.Message = &MessageEncryptedKey{}
+	case TypeIdentity:
+		h.Message = &MessageIdentity{}
 	default:
 		return errNotImplemented
 	}

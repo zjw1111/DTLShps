@@ -57,6 +57,9 @@ type Config struct {
 	PSK             PSKCallback
 	PSKIdentityHint []byte
 
+	// DTLShps use certificate and PSK at the same time
+	DTLShps bool
+
 	// InsecureSkipVerify controls whether a client verifies the
 	// server's certificate chain and host name.
 	// If InsecureSkipVerify is true, TLS accepts any certificate

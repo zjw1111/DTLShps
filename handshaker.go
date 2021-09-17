@@ -88,6 +88,7 @@ type handshakeFSM struct {
 }
 
 type handshakeConfig struct {
+	DTLShps                     bool
 	localPSKCallback            PSKCallback
 	localPSKIdentityHint        []byte
 	localCipherSuites           []CipherSuite             // Available CipherSuites
