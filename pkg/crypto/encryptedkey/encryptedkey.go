@@ -15,7 +15,7 @@ import (
 //    key: 加密key
 //    plaintext：加密明文
 //    ciphertext: 解密返回字节字符串[ 整型以十六进制方式显示]
-func AESCBCEncrypt(key, plaintext string) (ciphertext string) {
+func AESCBCEncryptFromString(key, plaintext string) (ciphertext string) {
 	plainbyte := []byte(plaintext)
 	keybyte := []byte(key)
 	if len(plainbyte)%aes.BlockSize != 0 {
@@ -39,11 +39,36 @@ func AESCBCEncrypt(key, plaintext string) (ciphertext string) {
 	return
 }
 
+// AES CBC 加密
+//    key: 加密key
+//    plaintext：加密明文
+//    ciphertext: 解密返回字节字符串[ 整型以十六进制方式显示]
+func AESCBCEncryptFromBytes(key, plaintext []byte) (ciphertext []byte) {
+	if len(plaintext)%aes.BlockSize != 0 {
+		panic("plaintext is not a multiple of the block size")
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err)
+	}
+
+	cipherbyte := make([]byte, aes.BlockSize+len(plaintext))
+	iv := cipherbyte[:aes.BlockSize]
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		panic(err)
+	}
+
+	mode := cipher.NewCBCEncrypter(block, iv)
+	mode.CryptBlocks(cipherbyte[aes.BlockSize:], plaintext)
+
+	return cipherbyte
+}
+
 // AES CBC 解密
 //    key: 解密key
 //    ciphertext: 加密返回的串
 //    plaintext：解密后的字符串
-func AESCBCDecrypt(key, ciphertext string) (plaintext string) {
+func AESCBCDecryptFromString(key, ciphertext string) (plaintext string) {
 	cipherbyte, _ := hex.DecodeString(ciphertext)
 	keybyte := []byte(key)
 	block, err := aes.NewCipher(keybyte)
@@ -63,9 +88,34 @@ func AESCBCDecrypt(key, ciphertext string) (plaintext string) {
 	mode := cipher.NewCBCDecrypter(block, iv)
 	mode.CryptBlocks(cipherbyte, cipherbyte)
 
-	//fmt.Printf("%s\n", ciphertext)
 	plaintext = string(cipherbyte[:])
 	return
+}
+
+// AES CBC 解密
+//    key: 解密key
+//    ciphertext: 加密返回的串
+//    plaintext：解密后的字符串
+func AESCBCDecryptFromBytes(key, ciphertext []byte) (plaintext []byte) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err)
+	}
+	if len(ciphertext) < aes.BlockSize {
+		panic("ciphertext too short")
+	}
+
+	iv := ciphertext[:aes.BlockSize]
+	cipherbyte := []byte(ciphertext[aes.BlockSize:])
+	if len(cipherbyte)%aes.BlockSize != 0 {
+		panic("ciphertext is not a multiple of the block size")
+	}
+
+	mode := cipher.NewCBCDecrypter(block, iv)
+	plaintext = make([]byte, len(cipherbyte))
+	mode.CryptBlocks(plaintext, cipherbyte)
+
+	return plaintext
 }
 
 // AES GCM 加密
@@ -120,7 +170,6 @@ func AESGCMDecrypt(key, ciphertext, noncetext string) (plaintext string) {
 		panic(err.Error())
 	}
 
-	//fmt.Printf("%s\n", ciphertext)
 	plaintext = string(plainbyte[:])
 	return
 }

@@ -7,13 +7,20 @@ import (
 
 func TestCBCEncryptAndDecrypt(t *testing.T) {
 	key := "example key 1234"
-	plaintext := "exampleplaintext"
+	plaintext := "exampleplaintextexampleplaintext"
 
-	ciphertext := AESCBCEncrypt(key, plaintext)
-	decryptPlaintext := AESCBCDecrypt(key, ciphertext)
+	ciphertext := AESCBCEncryptFromString(key, plaintext)
+	decryptPlaintext := AESCBCDecryptFromString(key, ciphertext)
 
 	if decryptPlaintext != plaintext {
 		t.Errorf("Decrypt error! The plaintext is: %s. The decrypted text is: %s\n", plaintext, decryptPlaintext)
+	}
+
+	cipherbyte := AESCBCEncryptFromBytes([]byte(key), []byte(plaintext))
+	decryptBytes := AESCBCDecryptFromBytes([]byte(key), cipherbyte)
+
+	if string(decryptBytes) != plaintext {
+		t.Errorf("Decrypt error! The plaintext is: %s. The decrypted text is: %s\n", []byte(plaintext), decryptBytes)
 	}
 }
 
