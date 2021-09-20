@@ -1,0 +1,30 @@
+// Package encryptedkey provides elliptic curve cryptography for DTLS
+package encryptedkey
+
+import (
+	"testing"
+)
+
+func TestCBCEncryptAndDecrypt(t *testing.T) {
+	key := "example key 1234"
+	plaintext := "exampleplaintext"
+
+	ciphertext := AESCBCEncrypt(key, plaintext)
+	decryptPlaintext := AESCBCDecrypt(key, ciphertext)
+
+	if decryptPlaintext != plaintext {
+		t.Errorf("Decrypt error! The plaintext is: %s. The decrypted text is: %s\n", plaintext, decryptPlaintext)
+	}
+}
+
+func TestGCMEncryptAndDecrypt(t *testing.T) {
+	key := "example key 1234"
+	plaintext := "exampleplaintext"
+
+	ciphertext, noncetext := AESGCMEncrypt(key, plaintext)
+	decryptPlaintext := AESGCMDecrypt(key, ciphertext, noncetext)
+
+	if decryptPlaintext != plaintext {
+		t.Errorf("Decrypt error! The plaintext is: %s. The decrypted text is: %s\n", plaintext, decryptPlaintext)
+	}
+}
