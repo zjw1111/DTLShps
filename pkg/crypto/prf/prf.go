@@ -2,8 +2,10 @@
 package prf
 
 import ( //nolint:gci
+	"bytes"
 	ellipticStdlib "crypto/elliptic"
 	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -11,6 +13,7 @@ import ( //nolint:gci
 	"math"
 
 	"github.com/zjw1111/DTLShps/pkg/crypto/elliptic"
+	"github.com/zjw1111/DTLShps/pkg/crypto/encryptedkey"
 	"github.com/zjw1111/DTLShps/pkg/protocol"
 	"golang.org/x/crypto/curve25519"
 )
@@ -72,6 +75,19 @@ func PSKPreMasterSecret(psk []byte) []byte {
 	binary.BigEndian.PutUint16(out[2+pskLen:], pskLen)
 
 	return out
+}
+
+// DTLShpsPreMasterSecret decrypts the DTLShps Premaster Secret from
+// message EncryptedKey using psk and nonce(ClientRandom or ServerRandom)
+func DTLShpsPreMasterSecret(psk []byte, nonce [32]byte, EncryptedKey []byte) []byte {
+	var buffer bytes.Buffer
+
+	buffer.Write(psk)
+	buffer.Write(nonce[:])
+	psk_nonce := buffer.Bytes()
+	hashkey := sha256.Sum256(psk_nonce)
+
+	return encryptedkey.AESCBCDecryptFromBytes(hashkey[:], EncryptedKey)
 }
 
 // PreMasterSecret implements TLS 1.2 Premaster Secret generation given a keypair and a curve

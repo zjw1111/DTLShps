@@ -1,13 +1,11 @@
 package dtls
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 
 	"github.com/zjw1111/DTLShps/pkg/crypto/elliptic"
-	"github.com/zjw1111/DTLShps/pkg/crypto/encryptedkey"
+	"github.com/zjw1111/DTLShps/pkg/crypto/prf"
 	"github.com/zjw1111/DTLShps/pkg/protocol"
 	"github.com/zjw1111/DTLShps/pkg/protocol/alert"
 	"github.com/zjw1111/DTLShps/pkg/protocol/extension"
@@ -97,14 +95,7 @@ func flight0Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
 			}
 			nonce := state.remoteRandom.MarshalFixed()
-			var buffer bytes.Buffer
-			buffer.Write(psk)
-			buffer.Write(nonce[:])
-			psk_nonce := buffer.Bytes()
-			hashkey := sha256.Sum256(psk_nonce)
-
-			state.preMasterSecret = encryptedkey.AESCBCDecryptFromBytes(hashkey[:], EncryptedKey.EncryptedKey)
-			cfg.log.Infof("en_key: %s", state.preMasterSecret)
+			state.preMasterSecret = prf.DTLShpsPreMasterSecret(psk, nonce, EncryptedKey.EncryptedKey)
 		}
 	}
 	state.handshakeRecvSequence = seq
