@@ -164,6 +164,7 @@ func createConn(ctx context.Context, nextConn net.Conn, config *Config, isClient
 
 	hsCfg := &handshakeConfig{
 		DTLShps:                     config.DTLShps,
+		TestWithoutController:       config.TestWithoutController,
 		SkipHelloVerify:             config.SkipHelloVerify,
 		localPSKCallback:            config.PSK,
 		localPSKIdentityHint:        config.PSKIdentityHint,

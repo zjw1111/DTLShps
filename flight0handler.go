@@ -71,14 +71,6 @@ func flight0Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InsufficientSecurity}, errServerRequiredButNoClientEMS
 	}
 
-	if state.localKeypair == nil {
-		var err error
-		state.localKeypair, err = elliptic.GenerateKeypair(state.namedCurve)
-		if err != nil {
-			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.IllegalParameter}, err
-		}
-	}
-
 	if cfg.DTLShps {
 		seq, msgs, ok = cache.fullPullMap(seq,
 			handshakeCachePullRule{handshake.TypeEncryptedKey, cfg.initialEpoch, true, false},
@@ -89,15 +81,21 @@ func flight0Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		if EncryptedKey, ok := msgs[handshake.TypeEncryptedKey].(*handshake.MessageEncryptedKey); !ok {
 			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoEncryptedKey}, errInvalidEncryptedKey
 		} else {
-			var psk []byte
-			var err error
-			if psk, err = cfg.localPSKCallback(cfg.localPSKIdentityHint); err != nil {
+			if psk, err := cfg.localPSKCallback(cfg.localPSKIdentityHint); err != nil {
 				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
+			} else {
+				nonce := state.remoteRandom.MarshalFixed()
+				state.preMasterSecret = prf.DTLShpsPreMasterSecret(psk, nonce, EncryptedKey.EncryptedKey)
 			}
-			nonce := state.remoteRandom.MarshalFixed()
-			state.preMasterSecret = prf.DTLShpsPreMasterSecret(psk, nonce, EncryptedKey.EncryptedKey)
+		}
+	} else if state.localKeypair == nil {
+		var err error
+		state.localKeypair, err = elliptic.GenerateKeypair(state.namedCurve)
+		if err != nil {
+			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.IllegalParameter}, err
 		}
 	}
+
 	state.handshakeRecvSequence = seq
 
 	// modify for skip HelloVerifyRequest (flight2 and flight3)

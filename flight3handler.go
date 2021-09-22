@@ -36,9 +36,9 @@ func flight3Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 	if cfg.DTLShps {
 		seq, msgs, ok = cache.fullPullMap(state.handshakeRecvSequence,
 			handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
-			handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, false, true},
-			handshakeCachePullRule{handshake.TypeServerKeyExchange, cfg.initialEpoch, false, true},
-			handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, true},
+			handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, false},
+			// BUG?: If the Identity message is empty(optional), it means that the controller did not
+			// send the Identity message, that is, the certificate verification failed
 			handshakeCachePullRule{handshake.TypeIdentity, cfg.initialEpoch, false, false},
 			handshakeCachePullRule{handshake.TypeEncryptedKey, cfg.initialEpoch, false, false},
 			handshakeCachePullRule{handshake.TypeServerHelloDone, cfg.initialEpoch, false, false},
@@ -63,6 +63,7 @@ func flight3Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		return 0, nil, nil
 	}
 	state.handshakeRecvSequence = seq
+	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAA")
 
 	if h, ok := msgs[handshake.TypeServerHello].(*handshake.MessageServerHello); ok {
 		if !h.Version.Equal(protocol.Version1_2) {
@@ -110,8 +111,6 @@ func flight3Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoCertificate}, errInvalidCertificate
 	}
 
-	// TODO
-
 	if h, ok := msgs[handshake.TypeServerKeyExchange].(*handshake.MessageServerKeyExchange); ok {
 		alertPtr, err := handleServerKeyExchange(c, state, cfg, h)
 		if err != nil {
@@ -125,21 +124,21 @@ func flight3Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 
 	if cfg.DTLShps {
 		if h, hasIdentity := msgs[handshake.TypeIdentity].(*handshake.MessageIdentity); !hasIdentity {
+			cfg.log.Error("Identity verify failed!")
 			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoIdentity}, errInvalidIdentity
 		} else {
-			cfg.log.Infof("Verify success! Identity is: %s\n", h.IdentityData)
+			cfg.log.Infof("Identity verify success! Identity is: %s\n", h.IdentityData)
 		}
 
 		if EncryptedKey, ok := msgs[handshake.TypeEncryptedKey].(*handshake.MessageEncryptedKey); !ok {
 			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoEncryptedKey}, errInvalidEncryptedKey
 		} else {
-			var psk []byte
-			var err error
-			if psk, err = cfg.localPSKCallback(cfg.localPSKIdentityHint); err != nil {
+			if psk, err := cfg.localPSKCallback(cfg.localPSKIdentityHint); err != nil {
 				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
+			} else {
+				nonce := state.remoteRandom.MarshalFixed()
+				state.preMasterSecret = prf.DTLShpsPreMasterSecret(psk, nonce, EncryptedKey.EncryptedKey)
 			}
-			nonce := state.remoteRandom.MarshalFixed()
-			state.preMasterSecret = prf.DTLShpsPreMasterSecret(psk, nonce, EncryptedKey.EncryptedKey)
 		}
 	}
 

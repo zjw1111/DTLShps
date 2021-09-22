@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
+	"fmt"
 
 	"github.com/zjw1111/DTLShps/pkg/crypto/prf"
 	"github.com/zjw1111/DTLShps/pkg/crypto/signaturehash"
@@ -27,6 +28,7 @@ func flight5Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 	if finished, ok = msgs[handshake.TypeFinished].(*handshake.MessageFinished); !ok {
 		return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, nil
 	}
+	// TODO Verify
 	plainText := cache.pullAndMerge(
 		handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
 		handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
@@ -52,8 +54,9 @@ func flight5Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 }
 
 func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *handshakeConfig) ([]*packet, *alert.Alert, error) { //nolint:gocognit
-	var certBytes [][]byte
+	var pkts []*packet
 	var privateKey crypto.PrivateKey
+	var certBytes [][]byte
 	if len(cfg.localCertificates) > 0 {
 		certificate, err := cfg.getCertificate(cfg.serverName)
 		if err != nil {
@@ -63,11 +66,10 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 		privateKey = certificate.PrivateKey
 	}
 
-	var pkts []*packet
-
-	if state.remoteRequestedCertificate {
-		pkts = append(pkts,
-			&packet{
+	if !cfg.TestWithoutController {
+		// send DTLShps packets with controller or just normal DTLS packets
+		if state.remoteRequestedCertificate {
+			pkts = append(pkts, &packet{
 				record: &recordlayer.RecordLayer{
 					Header: recordlayer.Header{
 						Version: protocol.Version1_2,
@@ -79,17 +81,18 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 					},
 				},
 			})
+		}
 	}
 
 	clientKeyExchange := &handshake.MessageClientKeyExchange{}
-	if cfg.localPSKCallback == nil {
-		clientKeyExchange.PublicKey = state.localKeypair.PublicKey
-	} else {
-		clientKeyExchange.IdentityHint = cfg.localPSKIdentityHint
-	}
+	if !cfg.DTLShps {
+		if cfg.localPSKCallback == nil {
+			clientKeyExchange.PublicKey = state.localKeypair.PublicKey
+		} else {
+			clientKeyExchange.IdentityHint = cfg.localPSKIdentityHint
+		}
 
-	pkts = append(pkts,
-		&packet{
+		pkts = append(pkts, &packet{
 			record: &recordlayer.RecordLayer{
 				Header: recordlayer.Header{
 					Version: protocol.Version1_2,
@@ -99,6 +102,7 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 				},
 			},
 		})
+	}
 
 	serverKeyExchangeData := cache.pullAndMerge(
 		handshakeCachePullRule{handshake.TypeServerKeyExchange, cfg.initialEpoch, false, false},
@@ -107,6 +111,7 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 	serverKeyExchange := &handshake.MessageServerKeyExchange{}
 
 	// handshakeMessageServerKeyExchange is optional for PSK
+	// TODO 与flight4 L120意思差不多，生成一个空的message
 	if len(serverKeyExchangeData) == 0 {
 		alertPtr, err := handleServerKeyExchange(c, state, cfg, &handshake.MessageServerKeyExchange{})
 		if err != nil {
@@ -151,6 +156,7 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 	// If the client has sent a certificate with signing ability, a digitally-signed
 	// CertificateVerify message is sent to explicitly verify possession of the
 	// private key in the certificate.
+	// TODO Client Cert Verify
 	if state.remoteRequestedCertificate && len(cfg.localCertificates) > 0 {
 		plainText := append(cache.pullAndMerge(
 			handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
@@ -164,6 +170,7 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 		), merged...)
 
 		// Find compatible signature scheme
+		// XXX check!
 		signatureHashAlgo, err := signaturehash.SelectSignatureScheme(cfg.localSignatureSchemes, privateKey)
 		if err != nil {
 			return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InsufficientSecurity}, err
@@ -175,45 +182,63 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 		}
 		state.localCertificatesVerify = certVerify
 
-		p := &packet{
+		if !cfg.TestWithoutController {
+			// send DTLShps packets with controller or just normal DTLS packets
+			p := &packet{
+				record: &recordlayer.RecordLayer{
+					Header: recordlayer.Header{
+						Version: protocol.Version1_2,
+					},
+					Content: &handshake.Handshake{
+						Message: &handshake.MessageCertificateVerify{
+							HashAlgorithm:      signatureHashAlgo.Hash,
+							SignatureAlgorithm: signatureHashAlgo.Signature,
+							Signature:          state.localCertificatesVerify,
+						},
+					},
+				},
+			}
+			pkts = append(pkts, p)
+
+			h, ok := p.record.Content.(*handshake.Handshake)
+			if !ok {
+				return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, errInvalidContentType
+			}
+			h.Header.MessageSequence = seqPred
+			// seqPred++ // this is the last use of seqPred
+			raw, err := h.Marshal()
+			if err != nil {
+				return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
+			}
+			merged = append(merged, raw...)
+		}
+	}
+
+	if cfg.TestWithoutController && cfg.DTLShps {
+		// send DTLShps packets without controller
+		pkts = append(pkts, &packet{
 			record: &recordlayer.RecordLayer{
 				Header: recordlayer.Header{
 					Version: protocol.Version1_2,
 				},
 				Content: &handshake.Handshake{
-					Message: &handshake.MessageCertificateVerify{
-						HashAlgorithm:      signatureHashAlgo.Hash,
-						SignatureAlgorithm: signatureHashAlgo.Signature,
-						Signature:          state.localCertificatesVerify,
+					Message: &handshake.MessageIdentity{
+						IdentityData: []byte("This is DTLShps Client!"),
 					},
 				},
 			},
-		}
-		pkts = append(pkts, p)
-
-		h, ok := p.record.Content.(*handshake.Handshake)
-		if !ok {
-			return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, errInvalidContentType
-		}
-		h.Header.MessageSequence = seqPred
-		// seqPred++ // this is the last use of seqPred
-		raw, err := h.Marshal()
-		if err != nil {
-			return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
-		}
-		merged = append(merged, raw...)
+		})
 	}
 
-	pkts = append(pkts,
-		&packet{
-			record: &recordlayer.RecordLayer{
-				Header: recordlayer.Header{
-					Version: protocol.Version1_2,
-				},
-				Content: &protocol.ChangeCipherSpec{},
+	pkts = append(pkts, &packet{
+		record: &recordlayer.RecordLayer{
+			Header: recordlayer.Header{
+				Version: protocol.Version1_2,
 			},
-		})
-
+			Content: &protocol.ChangeCipherSpec{},
+		},
+	})
+	// TODO verify
 	if len(state.localVerifyData) == 0 {
 		plainText := cache.pullAndMerge(
 			handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
@@ -234,23 +259,23 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 			return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
 		}
 	}
+	fmt.Printf("state.localVerifyData: %x\n", state.localVerifyData)
 
-	pkts = append(pkts,
-		&packet{
-			record: &recordlayer.RecordLayer{
-				Header: recordlayer.Header{
-					Version: protocol.Version1_2,
-					Epoch:   1,
-				},
-				Content: &handshake.Handshake{
-					Message: &handshake.MessageFinished{
-						VerifyData: state.localVerifyData,
-					},
+	pkts = append(pkts, &packet{
+		record: &recordlayer.RecordLayer{
+			Header: recordlayer.Header{
+				Version: protocol.Version1_2,
+				Epoch:   1,
+			},
+			Content: &handshake.Handshake{
+				Message: &handshake.MessageFinished{
+					VerifyData: state.localVerifyData,
 				},
 			},
-			shouldEncrypt:            true,
-			resetLocalSequenceNumber: true,
-		})
+		},
+		shouldEncrypt:            true,
+		resetLocalSequenceNumber: true,
+	})
 
 	return pkts, nil, nil
 }
@@ -283,7 +308,8 @@ func initalizeCipherSuite(state *State, cache *handshakeCache, cfg *handshakeCon
 		}
 	}
 
-	if state.cipherSuite.AuthenticationType() == CipherSuiteAuthenticationTypeCertificate {
+	// TODO cert verify
+	if !cfg.DTLShps && state.cipherSuite.AuthenticationType() == CipherSuiteAuthenticationTypeCertificate {
 		// Verify that the pair of hash algorithm and signiture is listed.
 		var validSignatureScheme bool
 		for _, ss := range cfg.localSignatureSchemes {

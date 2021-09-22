@@ -60,6 +60,9 @@ type Config struct {
 	// DTLShps use certificate and PSK at the same time
 	DTLShps bool
 
+	// Send test packets for running DTLShps client/server without DTLShps controller
+	TestWithoutController bool
+
 	// Skip HelloVerifyRequest message and ClientHello cookie verify
 	SkipHelloVerify bool
 
