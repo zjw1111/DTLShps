@@ -1,11 +1,15 @@
 package dtls
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/x509"
+	"fmt"
 
 	"github.com/zjw1111/DTLShps/pkg/crypto/clientcertificate"
 	"github.com/zjw1111/DTLShps/pkg/crypto/elliptic"
+	"github.com/zjw1111/DTLShps/pkg/crypto/encryptedkey"
 	"github.com/zjw1111/DTLShps/pkg/crypto/prf"
 	"github.com/zjw1111/DTLShps/pkg/crypto/signaturehash"
 	"github.com/zjw1111/DTLShps/pkg/protocol"
@@ -16,19 +20,39 @@ import (
 )
 
 func flight4Parse(ctx context.Context, c flightConn, state *State, cache *handshakeCache, cfg *handshakeConfig) (flightVal, *alert.Alert, error) { //nolint:gocognit
-	seq, msgs, ok := cache.fullPullMap(state.handshakeRecvSequence,
-		handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, true, true},
-		handshakeCachePullRule{handshake.TypeClientKeyExchange, cfg.initialEpoch, true, false},
-		handshakeCachePullRule{handshake.TypeCertificateVerify, cfg.initialEpoch, true, true},
-	)
+	var seq int
+	var msgs map[handshake.Type]handshake.Message
+	var ok bool
+	if cfg.DTLShps {
+		seq, msgs, ok = cache.fullPullMap(state.handshakeRecvSequence,
+			handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, true, true},
+			handshakeCachePullRule{handshake.TypeClientKeyExchange, cfg.initialEpoch, true, true},
+			handshakeCachePullRule{handshake.TypeCertificateVerify, cfg.initialEpoch, true, true},
+			handshakeCachePullRule{handshake.TypeIdentity, cfg.initialEpoch, true, false},
+		)
+	} else {
+		seq, msgs, ok = cache.fullPullMap(state.handshakeRecvSequence,
+			handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, true, true},
+			handshakeCachePullRule{handshake.TypeClientKeyExchange, cfg.initialEpoch, true, false},
+			handshakeCachePullRule{handshake.TypeCertificateVerify, cfg.initialEpoch, true, true},
+		)
+	}
 	if !ok {
 		// No valid message received. Keep reading
 		return 0, nil, nil
 	}
 
+	if cfg.DTLShps {
+		if h, hasIdentity := msgs[handshake.TypeIdentity].(*handshake.MessageIdentity); !hasIdentity {
+			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoIdentity}, errInvalidIdentity
+		} else {
+			cfg.log.Infof("Verify success! Identity is: %s\n", h.IdentityData)
+		}
+	}
+
 	// Validate type
 	var clientKeyExchange *handshake.MessageClientKeyExchange
-	if clientKeyExchange, ok = msgs[handshake.TypeClientKeyExchange].(*handshake.MessageClientKeyExchange); !ok {
+	if clientKeyExchange, ok = msgs[handshake.TypeClientKeyExchange].(*handshake.MessageClientKeyExchange); !cfg.DTLShps && !ok {
 		return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, nil
 	}
 
@@ -41,6 +65,7 @@ func flight4Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoCertificate}, errCertificateVerifyNoCertificate
 		}
 
+		// TODO Client Cert Verify
 		plainText := cache.pullAndMerge(
 			handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
 			handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
@@ -90,7 +115,11 @@ func flight4Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 
 		var err error
 		var preMasterSecret []byte
-		if state.cipherSuite.AuthenticationType() == CipherSuiteAuthenticationTypePreSharedKey {
+		if cfg.DTLShps {
+			fmt.Println("server use DTLShps")
+			fmt.Printf("state.preMasterSecret: %x\n", state.preMasterSecret)
+			preMasterSecret = state.preMasterSecret
+		} else if cfg.localPSKCallback != nil {
 			var psk []byte
 			if psk, err = cfg.localPSKCallback(clientKeyExchange.IdentityHint); err != nil {
 				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
@@ -115,6 +144,8 @@ func flight4Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 			if err != nil {
 				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
 			}
+			fmt.Printf("sessionHash: %x\n", sessionHash)
+			fmt.Printf("masterSecret: %x\n", state.masterSecret)
 		} else {
 			state.masterSecret, err = prf.MasterSecret(preMasterSecret, clientRandom[:], serverRandom[:], state.cipherSuite.HashFunc())
 			if err != nil {
@@ -150,24 +181,27 @@ func flight4Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		return flight6, nil, nil
 	}
 
-	switch cfg.clientAuth {
-	case RequireAnyClientCert:
-		if state.PeerCertificates == nil {
-			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoCertificate}, errClientCertificateRequired
+	// TODO clientAuth verify
+	if !cfg.DTLShps {
+		switch cfg.clientAuth {
+		case RequireAnyClientCert:
+			if state.PeerCertificates == nil {
+				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoCertificate}, errClientCertificateRequired
+			}
+		case VerifyClientCertIfGiven:
+			if state.PeerCertificates != nil && !state.peerCertificatesVerified {
+				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.BadCertificate}, errClientCertificateNotVerified
+			}
+		case RequireAndVerifyClientCert:
+			if state.PeerCertificates == nil {
+				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoCertificate}, errClientCertificateRequired
+			}
+			if !state.peerCertificatesVerified {
+				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.BadCertificate}, errClientCertificateNotVerified
+			}
+		case NoClientCert, RequestClientCert:
+			return flight6, nil, nil
 		}
-	case VerifyClientCertIfGiven:
-		if state.PeerCertificates != nil && !state.peerCertificatesVerified {
-			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.BadCertificate}, errClientCertificateNotVerified
-		}
-	case RequireAndVerifyClientCert:
-		if state.PeerCertificates == nil {
-			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoCertificate}, errClientCertificateRequired
-		}
-		if !state.peerCertificatesVerified {
-			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.BadCertificate}, errClientCertificateNotVerified
-		}
-	case NoClientCert, RequestClientCert:
-		return flight6, nil, nil
 	}
 
 	return flight6, nil, nil
@@ -220,6 +254,99 @@ func flight4Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 	})
 
 	switch {
+	case cfg.DTLShps:
+		certificate, err := cfg.getCertificate(cfg.serverName)
+		if err != nil {
+			return nil, &alert.Alert{Level: alert.Fatal, Description: alert.HandshakeFailure}, err
+		}
+
+		// XXX comment for test
+		pkts = append(pkts, &packet{
+			record: &recordlayer.RecordLayer{
+				Header: recordlayer.Header{
+					Version: protocol.Version1_2,
+				},
+				Content: &handshake.Handshake{
+					Message: &handshake.MessageCertificate{
+						Certificate: certificate.Certificate,
+					},
+				},
+			},
+		})
+
+		// pkts = append(pkts, &packet{
+		// 	record: &recordlayer.RecordLayer{
+		// 		Header: recordlayer.Header{
+		// 			Version: protocol.Version1_2,
+		// 		},
+		// 		Content: &handshake.Handshake{
+		// 			Message: &handshake.MessageServerKeyExchange{
+		// 				IdentityHint: cfg.localPSKIdentityHint,
+		// 			},
+		// 		},
+		// 	},
+		// })
+
+		// XXX comment for test
+		if cfg.clientAuth > NoClientCert {
+			pkts = append(pkts, &packet{
+				record: &recordlayer.RecordLayer{
+					Header: recordlayer.Header{
+						Version: protocol.Version1_2,
+					},
+					Content: &handshake.Handshake{
+						Message: &handshake.MessageCertificateRequest{
+							CertificateTypes:        []clientcertificate.Type{clientcertificate.RSASign, clientcertificate.ECDSASign},
+							SignatureHashAlgorithms: cfg.localSignatureSchemes,
+						},
+					},
+				},
+			})
+		}
+
+		// XXX Note: Only for Test
+		pkts = append(pkts, &packet{
+			record: &recordlayer.RecordLayer{
+				Header: recordlayer.Header{
+					Version: protocol.Version1_2,
+				},
+				Content: &handshake.Handshake{
+					Message: &handshake.MessageIdentity{
+						IdentityData: []byte("This is DTLShps Server!"),
+					},
+				},
+			},
+		})
+
+		// XXX Note: Only for Test
+		var psk []byte
+		if psk, err = cfg.localPSKCallback(cfg.localPSKIdentityHint); err != nil {
+			return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
+		}
+		nonce := state.localRandom.MarshalFixed()
+		var buffer bytes.Buffer
+		buffer.Write(psk)
+		buffer.Write(nonce[:])
+		psk_nonce := buffer.Bytes()
+		hashkey := sha256.Sum256(psk_nonce)
+		cfg.log.Infof("pskHint: %s", cfg.localPSKIdentityHint)
+		cfg.log.Infof("psk: %x", psk)
+		cfg.log.Infof("nonce: %x", nonce)
+		cfg.log.Infof("psk||nonce: %x", psk_nonce)
+
+		pkts = append(pkts, &packet{
+			record: &recordlayer.RecordLayer{
+				Header: recordlayer.Header{
+					Version: protocol.Version1_2,
+				},
+				Content: &handshake.Handshake{
+					Message: &handshake.MessageEncryptedKey{
+						EncryptedKey: encryptedkey.AESCBCEncryptFromBytes(hashkey[:], []byte("thisis encrypted key from client")),
+					},
+				},
+			},
+		})
+
 	case state.cipherSuite.AuthenticationType() == CipherSuiteAuthenticationTypeCertificate:
 		certificate, err := cfg.getCertificate(cfg.serverName)
 		if err != nil {

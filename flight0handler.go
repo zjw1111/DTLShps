@@ -1,10 +1,13 @@
 package dtls
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 
 	"github.com/zjw1111/DTLShps/pkg/crypto/elliptic"
+	"github.com/zjw1111/DTLShps/pkg/crypto/encryptedkey"
 	"github.com/zjw1111/DTLShps/pkg/protocol"
 	"github.com/zjw1111/DTLShps/pkg/protocol/alert"
 	"github.com/zjw1111/DTLShps/pkg/protocol/extension"
@@ -19,7 +22,6 @@ func flight0Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		// No valid message received. Keep reading
 		return 0, nil, nil
 	}
-	state.handshakeRecvSequence = seq
 
 	var clientHello *handshake.MessageClientHello
 
@@ -64,8 +66,6 @@ func flight0Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 			}
 		case *extension.ServerName:
 			state.serverName = e.ServerName // remote server name
-		case *extension.EncryptedKey:
-			cfg.log.Infof("extension.EncryptedKey: %s\n", e.EncryptedKey)
 		}
 	}
 
@@ -80,6 +80,34 @@ func flight0Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.IllegalParameter}, err
 		}
 	}
+
+	if cfg.DTLShps {
+		seq, msgs, ok = cache.fullPullMap(seq,
+			handshakeCachePullRule{handshake.TypeEncryptedKey, cfg.initialEpoch, true, false},
+		)
+		if !ok {
+			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoEncryptedKey}, errInvalidEncryptedKey
+		}
+		if EncryptedKey, ok := msgs[handshake.TypeEncryptedKey].(*handshake.MessageEncryptedKey); !ok {
+			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoEncryptedKey}, errInvalidEncryptedKey
+		} else {
+			var psk []byte
+			var err error
+			if psk, err = cfg.localPSKCallback(cfg.localPSKIdentityHint); err != nil {
+				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
+			}
+			nonce := state.remoteRandom.MarshalFixed()
+			var buffer bytes.Buffer
+			buffer.Write(psk)
+			buffer.Write(nonce[:])
+			psk_nonce := buffer.Bytes()
+			hashkey := sha256.Sum256(psk_nonce)
+
+			state.preMasterSecret = encryptedkey.AESCBCDecryptFromBytes(hashkey[:], EncryptedKey.EncryptedKey)
+			cfg.log.Infof("en_key: %s", state.preMasterSecret)
+		}
+	}
+	state.handshakeRecvSequence = seq
 
 	// modify for skip HelloVerifyRequest (flight2 and flight3)
 	if cfg.DTLShps || cfg.SkipHelloVerify {

@@ -1,9 +1,13 @@
 package dtls
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"fmt"
 
 	"github.com/zjw1111/DTLShps/pkg/crypto/elliptic"
+	"github.com/zjw1111/DTLShps/pkg/crypto/encryptedkey"
 	"github.com/zjw1111/DTLShps/pkg/crypto/prf"
 	"github.com/zjw1111/DTLShps/pkg/protocol"
 	"github.com/zjw1111/DTLShps/pkg/protocol/alert"
@@ -32,7 +36,17 @@ func flight3Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		}
 	}
 
-	if cfg.localPSKCallback != nil {
+	if cfg.DTLShps {
+		seq, msgs, ok = cache.fullPullMap(state.handshakeRecvSequence,
+			handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, false, true},
+			handshakeCachePullRule{handshake.TypeServerKeyExchange, cfg.initialEpoch, false, true},
+			handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, true},
+			handshakeCachePullRule{handshake.TypeIdentity, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeEncryptedKey, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeServerHelloDone, cfg.initialEpoch, false, false},
+		)
+	} else if cfg.localPSKCallback != nil {
 		seq, msgs, ok = cache.fullPullMap(state.handshakeRecvSequence,
 			handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
 			handshakeCachePullRule{handshake.TypeServerKeyExchange, cfg.initialEpoch, false, true},
@@ -95,9 +109,11 @@ func flight3Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 
 	if h, ok := msgs[handshake.TypeCertificate].(*handshake.MessageCertificate); ok {
 		state.PeerCertificates = h.Certificate
-	} else if state.cipherSuite.AuthenticationType() == CipherSuiteAuthenticationTypeCertificate {
+	} else if !cfg.DTLShps && state.cipherSuite.AuthenticationType() == CipherSuiteAuthenticationTypeCertificate {
 		return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoCertificate}, errInvalidCertificate
 	}
+
+	// TODO
 
 	if h, ok := msgs[handshake.TypeServerKeyExchange].(*handshake.MessageServerKeyExchange); ok {
 		alertPtr, err := handleServerKeyExchange(c, state, cfg, h)
@@ -110,16 +126,47 @@ func flight3Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		state.remoteRequestedCertificate = true
 	}
 
+	if cfg.DTLShps {
+		if h, hasIdentity := msgs[handshake.TypeIdentity].(*handshake.MessageIdentity); !hasIdentity {
+			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoIdentity}, errInvalidIdentity
+		} else {
+			cfg.log.Infof("Verify success! Identity is: %s\n", h.IdentityData)
+		}
+
+		if EncryptedKey, ok := msgs[handshake.TypeEncryptedKey].(*handshake.MessageEncryptedKey); !ok {
+			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoEncryptedKey}, errInvalidEncryptedKey
+		} else {
+			var psk []byte
+			var err error
+			if psk, err = cfg.localPSKCallback(cfg.localPSKIdentityHint); err != nil {
+				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
+			}
+			nonce := state.remoteRandom.MarshalFixed()
+			var buffer bytes.Buffer
+			buffer.Write(psk)
+			buffer.Write(nonce[:])
+			psk_nonce := buffer.Bytes()
+			hashkey := sha256.Sum256(psk_nonce)
+
+			state.preMasterSecret = encryptedkey.AESCBCDecryptFromBytes(hashkey[:], EncryptedKey.EncryptedKey)
+			cfg.log.Infof("en_key: %s", state.preMasterSecret)
+		}
+	}
+
 	return flight5, nil, nil
 }
 
 func handleServerKeyExchange(_ flightConn, state *State, cfg *handshakeConfig, h *handshake.MessageServerKeyExchange) (*alert.Alert, error) {
 	var err error
-	if cfg.localPSKCallback != nil {
+	if cfg.DTLShps {
+		fmt.Println("client use DTLShps")
+		fmt.Printf("state.preMasterSecret: %x\n", state.preMasterSecret)
+	} else if cfg.localPSKCallback != nil {
 		var psk []byte
 		if psk, err = cfg.localPSKCallback(h.IdentityHint); err != nil {
 			return &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
 		}
+		fmt.Printf("psk: %x\n", psk)
 		state.IdentityHint = h.IdentityHint
 		state.preMasterSecret = prf.PSKPreMasterSecret(psk)
 	} else {
