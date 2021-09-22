@@ -35,6 +35,9 @@ var (
 	errClientRequiredButNoServerEMS      = &FatalError{Err: errors.New("client required Extended Master Secret extension, but server does not support it")}         //nolint:goerr113
 	errCookieMismatch                    = &FatalError{Err: errors.New("client+server cookie does not match")}                                                      //nolint:goerr113
 	errIdentityNoPSK                     = &FatalError{Err: errors.New("PSK Identity Hint provided but PSK is nil")}                                                //nolint:goerr113
+	errDTLShpsNoPSK                      = &FatalError{Err: errors.New("DTLShps protocol is used but PSK is nil")}                                                  //nolint:goerr113
+	errInvalidEncryptedKey               = &FatalError{Err: errors.New("no encrypted key provided")}                                                                //nolint:goerr113
+	errInvalidIdentity                   = &FatalError{Err: errors.New("no identity provided")}                                                                     //nolint:goerr113
 	errInvalidCertificate                = &FatalError{Err: errors.New("no certificate provided")}                                                                  //nolint:goerr113
 	errInvalidCipherSuite                = &FatalError{Err: errors.New("invalid or unknown cipher suite")}                                                          //nolint:goerr113
 	errInvalidECDSASignature             = &FatalError{Err: errors.New("ECDSA signature contained zero or negative values")}                                        //nolint:goerr113

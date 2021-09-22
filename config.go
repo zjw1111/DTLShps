@@ -179,6 +179,8 @@ func validateConfig(config *Config) error {
 		return errNoConfigProvided
 	case config.PSKIdentityHint != nil && config.PSK == nil:
 		return errIdentityNoPSK
+	case config.DTLShps && config.PSK == nil:
+		return errDTLShpsNoPSK
 	}
 
 	for _, cert := range config.Certificates {

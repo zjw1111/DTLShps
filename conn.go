@@ -106,8 +106,8 @@ func createConn(ctx context.Context, nextConn net.Conn, config *Config, isClient
 	if loggerFactory == nil {
 		// 添加环境变量 PION_LOG_TRACE=dtls PION_LOG_DEBUG=dtls ... 可以动态设置log输出级别
 		// 或者构造logger的时候把level写死
-		// loggerFactory = logging.NewDefaultLoggerFactory()
-		loggerFactory = &logging.DefaultLoggerFactory{DefaultLogLevel: logging.LogLevelInfo}
+		loggerFactory = logging.NewDefaultLoggerFactory()
+		// loggerFactory = &logging.DefaultLoggerFactory{DefaultLogLevel: logging.LogLevelInfo}
 	}
 
 	logger := loggerFactory.NewLogger("dtls")
@@ -259,7 +259,7 @@ func ClientWithContext(ctx context.Context, conn net.Conn, config *Config) (*Con
 	switch {
 	case config == nil:
 		return nil, errNoConfigProvided
-	case config.PSK != nil && config.PSKIdentityHint == nil:
+	case !config.DTLShps && config.PSK != nil && config.PSKIdentityHint == nil:
 		return nil, errPSKAndIdentityMustBeSetForClient
 	}
 
@@ -672,6 +672,7 @@ func (c *Conn) handleIncomingPacket(buf []byte, enqueue bool) (bool, *alert.Aler
 		return false, nil, nil
 	}
 
+	// c.log.Tracef("buf: %x\n", buf)
 	// Decrypt
 	if h.Epoch != 0 {
 		if c.state.cipherSuite == nil || !c.state.cipherSuite.IsInitialized() {
@@ -684,6 +685,7 @@ func (c *Conn) handleIncomingPacket(buf []byte, enqueue bool) (bool, *alert.Aler
 
 		var err error
 		buf, err = c.state.cipherSuite.Decrypt(buf)
+		// c.log.Tracef("decrypted buf: %x\n", buf)
 		if err != nil {
 			c.log.Debugf("%s: decrypt failed: %s", srvCliStr(c.state.isClient), err)
 			return false, nil, nil

@@ -59,6 +59,8 @@ const (
 	InternalError          Description = 80
 	UserCanceled           Description = 90
 	NoRenegotiation        Description = 100
+	NoEncryptedKey         Description = 101
+	NoIdentity             Description = 102
 	UnsupportedExtension   Description = 110
 )
 
@@ -112,6 +114,10 @@ func (d Description) String() string {
 		return "UserCanceled"
 	case NoRenegotiation:
 		return "NoRenegotiation"
+	case NoEncryptedKey:
+		return "NoEncryptedKey"
+	case NoIdentity:
+		return "NoIdentity"
 	case UnsupportedExtension:
 		return "UnsupportedExtension"
 	default:
