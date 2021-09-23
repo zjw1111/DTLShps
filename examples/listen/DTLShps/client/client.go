@@ -8,6 +8,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/pion/logging"
 	dtls "github.com/zjw1111/DTLShps"
 	"github.com/zjw1111/DTLShps/examples/util"
 )
@@ -44,7 +45,7 @@ func main() {
 		Certificates:          []tls.Certificate{*certificate},
 		RootCAs:               certPool,
 		ServerName:            "server", // ServerName must be the same as 'subject: CN' in server's cert
-
+		LoggerFactory:         &logging.DefaultLoggerFactory{DefaultLogLevel: logging.LogLevelTrace},
 	}
 
 	// Connect to a DTLS server

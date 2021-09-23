@@ -105,9 +105,9 @@ func createConn(ctx context.Context, nextConn net.Conn, config *Config, isClient
 	loggerFactory := config.LoggerFactory
 	if loggerFactory == nil {
 		// 添加环境变量 PION_LOG_TRACE=dtls PION_LOG_DEBUG=dtls ... 可以动态设置log输出级别
-		// 或者构造logger的时候把level写死
+		// 或者client/server的config里面指定LoggerFactory
+		// e.g. &dtls.Config{LoggerFactory: &logging.DefaultLoggerFactory{DefaultLogLevel: logging.LogLevelTrace}}
 		loggerFactory = logging.NewDefaultLoggerFactory()
-		// loggerFactory = &logging.DefaultLoggerFactory{DefaultLogLevel: logging.LogLevelInfo}
 	}
 
 	logger := loggerFactory.NewLogger("dtls")

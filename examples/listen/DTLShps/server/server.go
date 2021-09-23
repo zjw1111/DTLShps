@@ -8,6 +8,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/pion/logging"
 	dtls "github.com/zjw1111/DTLShps"
 	"github.com/zjw1111/DTLShps/examples/util"
 )
@@ -48,6 +49,7 @@ func main() {
 		Certificates:          []tls.Certificate{*certificate},
 		ClientAuth:            dtls.RequireAndVerifyClientCert,
 		ClientCAs:             certPool,
+		LoggerFactory:         &logging.DefaultLoggerFactory{DefaultLogLevel: logging.LogLevelTrace},
 		// Create timeout context for accepted connection.
 		ConnectContextMaker: func() (context.Context, func()) {
 			return context.WithTimeout(ctx, 30*time.Second)
