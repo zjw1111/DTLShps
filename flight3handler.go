@@ -1,10 +1,13 @@
 package dtls
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
 
 	"github.com/zjw1111/DTLShps/pkg/crypto/elliptic"
+	"github.com/zjw1111/DTLShps/pkg/crypto/encryptedkey"
 	"github.com/zjw1111/DTLShps/pkg/crypto/prf"
 	"github.com/zjw1111/DTLShps/pkg/protocol"
 	"github.com/zjw1111/DTLShps/pkg/protocol/alert"
@@ -63,7 +66,6 @@ func flight3Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		return 0, nil, nil
 	}
 	state.handshakeRecvSequence = seq
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAA")
 
 	if h, ok := msgs[handshake.TypeServerHello].(*handshake.MessageServerHello); ok {
 		if !h.Version.Equal(protocol.Version1_2) {
@@ -123,14 +125,14 @@ func flight3Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 	}
 
 	if cfg.DTLShps {
-		if h, hasIdentity := msgs[handshake.TypeIdentity].(*handshake.MessageIdentity); !hasIdentity {
+		if h, hasIdentity := msgs[handshake.TypeIdentity].(*handshake.MessageIdentity); !hasIdentity || len(h.IdentityData) == 0 {
 			cfg.log.Error("Identity verify failed!")
 			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoIdentity}, errInvalidIdentity
 		} else {
 			cfg.log.Infof("Identity verify success! Identity is: %s\n", h.IdentityData)
 		}
 
-		if EncryptedKey, ok := msgs[handshake.TypeEncryptedKey].(*handshake.MessageEncryptedKey); !ok {
+		if EncryptedKey, ok := msgs[handshake.TypeEncryptedKey].(*handshake.MessageEncryptedKey); !ok || len(EncryptedKey.EncryptedKey) == 0 {
 			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoEncryptedKey}, errInvalidEncryptedKey
 		} else {
 			if psk, err := cfg.localPSKCallback(cfg.localPSKIdentityHint); err != nil {
@@ -208,23 +210,52 @@ func flight3Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 		extensions = append(extensions, &extension.ServerName{ServerName: cfg.serverName})
 	}
 
-	return []*packet{
-		{
-			record: &recordlayer.RecordLayer{
-				Header: recordlayer.Header{
-					Version: protocol.Version1_2,
-				},
-				Content: &handshake.Handshake{
-					Message: &handshake.MessageClientHello{
-						Version:            protocol.Version1_2,
-						Cookie:             state.cookie,
-						Random:             state.localRandom,
-						CipherSuiteIDs:     cipherSuiteIDs(cfg.localCipherSuites),
-						CompressionMethods: defaultCompressionMethods(),
-						Extensions:         extensions,
-					},
+	var pkts []*packet
+
+	pkts = append(pkts, &packet{
+		record: &recordlayer.RecordLayer{
+			Header: recordlayer.Header{
+				Version: protocol.Version1_2,
+			},
+			Content: &handshake.Handshake{
+				Message: &handshake.MessageClientHello{
+					Version:            protocol.Version1_2,
+					Cookie:             state.cookie,
+					Random:             state.localRandom,
+					CipherSuiteIDs:     cipherSuiteIDs(cfg.localCipherSuites),
+					CompressionMethods: defaultCompressionMethods(),
+					Extensions:         extensions,
 				},
 			},
 		},
-	}, nil, nil
+	})
+
+	if cfg.TestWithoutController && !cfg.SkipHelloVerify {
+		// send DTLShps packets without controller
+		if psk, err := cfg.localPSKCallback(cfg.localPSKIdentityHint); err != nil {
+			return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
+		} else {
+			nonce := state.localRandom.MarshalFixed()
+			var buffer bytes.Buffer
+			buffer.Write(psk)
+			buffer.Write(nonce[:])
+			psk_nonce := buffer.Bytes()
+			hashkey := sha256.Sum256(psk_nonce)
+
+			pkts = append(pkts, &packet{
+				record: &recordlayer.RecordLayer{
+					Header: recordlayer.Header{
+						Version: protocol.Version1_2,
+					},
+					Content: &handshake.Handshake{
+						Message: &handshake.MessageEncryptedKey{
+							EncryptedKey: encryptedkey.AESCBCEncryptFromBytes(hashkey[:], []byte("this is encryptedkey for DTLShps")),
+						},
+					},
+				},
+			})
+		}
+	}
+
+	return pkts, nil, nil
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 
+	"github.com/zjw1111/DTLShps/pkg/crypto/prf"
 	"github.com/zjw1111/DTLShps/pkg/protocol"
 	"github.com/zjw1111/DTLShps/pkg/protocol/alert"
 	"github.com/zjw1111/DTLShps/pkg/protocol/handshake"
@@ -19,7 +20,6 @@ func flight2Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		// Parse as flight 0 in this case.
 		return flight0Parse(ctx, c, state, cache, cfg)
 	}
-	state.handshakeRecvSequence = seq
 
 	var clientHello *handshake.MessageClientHello
 
@@ -38,6 +38,27 @@ func flight2Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 	if !bytes.Equal(state.cookie, clientHello.Cookie) {
 		return 0, &alert.Alert{Level: alert.Fatal, Description: alert.AccessDenied}, errCookieMismatch
 	}
+
+	if cfg.DTLShps && !cfg.SkipHelloVerify {
+		seq, msgs, ok = cache.fullPullMap(seq,
+			handshakeCachePullRule{handshake.TypeEncryptedKey, cfg.initialEpoch, true, false},
+		)
+		if !ok {
+			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoEncryptedKey}, errInvalidEncryptedKey
+		}
+		if EncryptedKey, ok := msgs[handshake.TypeEncryptedKey].(*handshake.MessageEncryptedKey); !ok || len(EncryptedKey.EncryptedKey) == 0 {
+			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoEncryptedKey}, errInvalidEncryptedKey
+		} else {
+			if psk, err := cfg.localPSKCallback(cfg.localPSKIdentityHint); err != nil {
+				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
+			} else {
+				nonce := state.remoteRandom.MarshalFixed()
+				state.preMasterSecret = prf.DTLShpsPreMasterSecret(psk, nonce, EncryptedKey.EncryptedKey)
+			}
+		}
+	}
+	state.handshakeRecvSequence = seq
+
 	return flight4, nil, nil
 }
 

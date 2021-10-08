@@ -14,11 +14,15 @@ func (m MessageIdentity) Type() Type {
 
 // Marshal encodes the Handshake
 func (m *MessageIdentity) Marshal() ([]byte, error) {
-	return append([]byte{}, m.IdentityData...), nil
+	return append([]byte{byte(len(m.IdentityData))}, m.IdentityData...), nil
 }
 
 // Unmarshal populates the message from encoded data
 func (m *MessageIdentity) Unmarshal(data []byte) error {
-	m.IdentityData = append([]byte{}, data...)
+	if identityDataLength := int(data[0]); len(data) != identityDataLength+1 {
+		return errBufferTooSmall
+	}
+
+	m.IdentityData = append([]byte{}, data[1:]...)
 	return nil
 }

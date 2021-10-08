@@ -15,11 +15,15 @@ func (m MessageEncryptedKey) Type() Type {
 
 // Marshal encodes the Handshake
 func (m *MessageEncryptedKey) Marshal() ([]byte, error) {
-	return append([]byte{}, m.EncryptedKey...), nil
+	return append([]byte{byte(len(m.EncryptedKey))}, m.EncryptedKey...), nil
 }
 
 // Unmarshal populates the message from encoded data
 func (m *MessageEncryptedKey) Unmarshal(data []byte) error {
-	m.EncryptedKey = append([]byte{}, data...)
+	if encryptedKeyLength := int(data[0]); len(data) != encryptedKeyLength+1 {
+		return errBufferTooSmall
+	}
+
+	m.EncryptedKey = append([]byte{}, data[1:]...)
 	return nil
 }

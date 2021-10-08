@@ -113,7 +113,7 @@ func flight1Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 		},
 	})
 
-	if cfg.TestWithoutController {
+	if cfg.TestWithoutController && cfg.SkipHelloVerify {
 		// send DTLShps packets without controller
 		if psk, err := cfg.localPSKCallback(cfg.localPSKIdentityHint); err != nil {
 			return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err

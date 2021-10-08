@@ -71,14 +71,14 @@ func flight0Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InsufficientSecurity}, errServerRequiredButNoClientEMS
 	}
 
-	if cfg.DTLShps {
+	if cfg.DTLShps && (cfg.SkipHelloVerify || !cfg.TestWithoutController) {
 		seq, msgs, ok = cache.fullPullMap(seq,
 			handshakeCachePullRule{handshake.TypeEncryptedKey, cfg.initialEpoch, true, false},
 		)
 		if !ok {
 			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoEncryptedKey}, errInvalidEncryptedKey
 		}
-		if EncryptedKey, ok := msgs[handshake.TypeEncryptedKey].(*handshake.MessageEncryptedKey); !ok {
+		if EncryptedKey, ok := msgs[handshake.TypeEncryptedKey].(*handshake.MessageEncryptedKey); !ok || len(EncryptedKey.EncryptedKey) == 0 {
 			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoEncryptedKey}, errInvalidEncryptedKey
 		} else {
 			if psk, err := cfg.localPSKCallback(cfg.localPSKIdentityHint); err != nil {
@@ -99,7 +99,7 @@ func flight0Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 	state.handshakeRecvSequence = seq
 
 	// modify for skip HelloVerifyRequest (flight2 and flight3)
-	if cfg.DTLShps || cfg.SkipHelloVerify {
+	if cfg.DTLShps && !cfg.TestWithoutController || cfg.SkipHelloVerify {
 		return flight4, nil, nil
 	} else {
 		return flight2, nil, nil
