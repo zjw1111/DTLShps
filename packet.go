@@ -6,4 +6,5 @@ type packet struct {
 	record                   *recordlayer.RecordLayer
 	shouldEncrypt            bool
 	resetLocalSequenceNumber bool
+	addOneMessageSequence    bool
 }

@@ -19,12 +19,14 @@ func main() {
 	// Parse configs
 	var host string
 	var port int
-	var test bool
+	var testWithoutController bool
+	var skipHelloVerify bool
 	var logLevel string
 	flag.StringVar(&host, "s", "127.0.0.1", "listen `ip`")
 	flag.IntVar(&port, "p", 4444, "listen `port`")
-	flag.BoolVar(&test, "t", false, "test program without controller")
+	flag.BoolVar(&testWithoutController, "t", false, "test program without controller")
 	flag.StringVar(&logLevel, "l", "INFO", "log `level`(case insensitive): DISABLED, ERROR, WARN, INFO, DEBUG, TRACE")
+	flag.BoolVar(&skipHelloVerify, "sv", false, "skip helloverify message and cookie verify")
 	flag.Parse()
 
 	// Prepare the IP to connect to
@@ -69,12 +71,13 @@ func main() {
 	config := &dtls.Config{
 		PSK: func(hint []byte) ([]byte, error) {
 			fmt.Printf("Client's hint: %s \n", hint)
-			return []byte{0xAB, 0xC1, 0x23}, nil
+			return []byte("ABCDEF"), nil
 		},
 		// CipherSuites:         []dtls.CipherSuiteID{dtls.TLS_PSK_WITH_AES_128_GCM_SHA256},
-		ExtendedMasterSecret:  dtls.RequireExtendedMasterSecret,
+		ExtendedMasterSecret:  dtls.DisableExtendedMasterSecret,
 		DTLShps:               true,
-		TestWithoutController: test,
+		TestWithoutController: testWithoutController,
+		SkipHelloVerify:       skipHelloVerify,
 		Certificates:          []tls.Certificate{*certificate},
 		ClientCAs:             certPool,
 		LoggerFactory:         logger,

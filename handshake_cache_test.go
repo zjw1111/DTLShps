@@ -199,7 +199,7 @@ func TestHandshakeCacheSessionHash(t *testing.T) {
 		}
 
 		cipherSuite := ciphersuite.TLSEcdheEcdsaWithAes128GcmSha256{}
-		verifyData, err := h.sessionHash(cipherSuite.HashFunc(), 0)
+		verifyData, err := h.sessionHash(false, cipherSuite.HashFunc(), 0)
 		if err != nil {
 			t.Error(err)
 		}

@@ -136,20 +136,30 @@ func (h *handshakeCache) pullAndMerge(rules ...handshakeCachePullRule) []byte {
 
 // sessionHash returns the session hash for Extended Master Secret support
 // https://tools.ietf.org/html/draft-ietf-tls-session-hash-06#section-4
-func (h *handshakeCache) sessionHash(hf prf.HashFunc, epoch uint16, additional ...[]byte) ([]byte, error) {
+func (h *handshakeCache) sessionHash(isDTLShps bool, hf prf.HashFunc, epoch uint16, additional ...[]byte) ([]byte, error) {
 	merged := []byte{}
 
 	// Order defined by https://tools.ietf.org/html/rfc5246#section-7.3
-	handshakeBuffer := h.pull(
-		handshakeCachePullRule{handshake.TypeClientHello, epoch, true, false},
-		handshakeCachePullRule{handshake.TypeServerHello, epoch, false, false},
-		handshakeCachePullRule{handshake.TypeCertificate, epoch, false, false},
-		handshakeCachePullRule{handshake.TypeServerKeyExchange, epoch, false, false},
-		handshakeCachePullRule{handshake.TypeCertificateRequest, epoch, false, false},
-		handshakeCachePullRule{handshake.TypeServerHelloDone, epoch, false, false},
-		handshakeCachePullRule{handshake.TypeCertificate, epoch, true, false},
-		handshakeCachePullRule{handshake.TypeClientKeyExchange, epoch, true, false},
-	)
+	// NOTE: extendedMasterSecret hash calc
+	var handshakeBuffer []*handshakeCacheItem
+	if isDTLShps {
+		handshakeBuffer = h.pull(
+			handshakeCachePullRule{handshake.TypeServerHello, epoch, false, false},
+			handshakeCachePullRule{handshake.TypeCertificateRequest, epoch, false, false},
+			handshakeCachePullRule{handshake.TypeServerHelloDone, epoch, false, false},
+		)
+	} else {
+		handshakeBuffer = h.pull(
+			handshakeCachePullRule{handshake.TypeClientHello, epoch, true, false},
+			handshakeCachePullRule{handshake.TypeServerHello, epoch, false, false},
+			handshakeCachePullRule{handshake.TypeCertificate, epoch, false, false},
+			handshakeCachePullRule{handshake.TypeServerKeyExchange, epoch, false, false},
+			handshakeCachePullRule{handshake.TypeCertificateRequest, epoch, false, false},
+			handshakeCachePullRule{handshake.TypeServerHelloDone, epoch, false, false},
+			handshakeCachePullRule{handshake.TypeCertificate, epoch, true, false},
+			handshakeCachePullRule{handshake.TypeClientKeyExchange, epoch, true, false},
+		)
+	}
 
 	for _, p := range handshakeBuffer {
 		if p == nil {
@@ -158,8 +168,10 @@ func (h *handshakeCache) sessionHash(hf prf.HashFunc, epoch uint16, additional .
 
 		merged = append(merged, p.data...)
 	}
-	for _, a := range additional {
-		merged = append(merged, a...)
+	if !isDTLShps {
+		for _, a := range additional {
+			merged = append(merged, a...)
+		}
 	}
 
 	hash := hf()

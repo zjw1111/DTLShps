@@ -40,19 +40,30 @@ func flight6Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 			},
 		})
 
+	// NOTE 发送 server Finish Verify
 	if len(state.localVerifyData) == 0 {
-		plainText := cache.pullAndMerge(
-			handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
-			handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
-			handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, false, false},
-			handshakeCachePullRule{handshake.TypeServerKeyExchange, cfg.initialEpoch, false, false},
-			handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, false},
-			handshakeCachePullRule{handshake.TypeServerHelloDone, cfg.initialEpoch, false, false},
-			handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, true, false},
-			handshakeCachePullRule{handshake.TypeClientKeyExchange, cfg.initialEpoch, true, false},
-			handshakeCachePullRule{handshake.TypeCertificateVerify, cfg.initialEpoch, true, false},
-			handshakeCachePullRule{handshake.TypeFinished, cfg.initialEpoch + 1, true, false},
-		)
+		var plainText []byte
+		if cfg.DTLShps {
+			plainText = cache.pullAndMerge(
+				handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
+				handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, false},
+				handshakeCachePullRule{handshake.TypeServerHelloDone, cfg.initialEpoch, false, false},
+				handshakeCachePullRule{handshake.TypeFinished, cfg.initialEpoch + 1, true, false},
+			)
+		} else {
+			plainText = cache.pullAndMerge(
+				handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
+				handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
+				handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, false, false},
+				handshakeCachePullRule{handshake.TypeServerKeyExchange, cfg.initialEpoch, false, false},
+				handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, false},
+				handshakeCachePullRule{handshake.TypeServerHelloDone, cfg.initialEpoch, false, false},
+				handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, true, false},
+				handshakeCachePullRule{handshake.TypeClientKeyExchange, cfg.initialEpoch, true, false},
+				handshakeCachePullRule{handshake.TypeCertificateVerify, cfg.initialEpoch, true, false},
+				handshakeCachePullRule{handshake.TypeFinished, cfg.initialEpoch + 1, true, false},
+			)
+		}
 
 		var err error
 		state.localVerifyData, err = prf.VerifyDataServer(state.masterSecret, plainText, state.cipherSuite.HashFunc())
@@ -74,6 +85,8 @@ func flight6Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 					},
 				},
 			},
+			// when use controller, the controller will send one more message, so MessageSequence needs to add one
+			addOneMessageSequence:    !cfg.TestWithoutController,
 			shouldEncrypt:            true,
 			resetLocalSequenceNumber: true,
 		},
