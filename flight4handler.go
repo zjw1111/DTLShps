@@ -25,8 +25,6 @@ func flight4Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 	var ok bool
 	if cfg.DTLShps {
 		seq, msgs, ok = cache.fullPullMap(state.handshakeRecvSequence,
-			// BUG?: If the Identity message is empty(optional), it means that the controller did not
-			// send the Identity message, that is, the certificate verification failed
 			handshakeCachePullRule{handshake.TypeIdentity, cfg.initialEpoch, true, false},
 		)
 	} else {
@@ -42,7 +40,7 @@ func flight4Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 	}
 
 	if cfg.DTLShps {
-		if h, hasIdentity := msgs[handshake.TypeIdentity].(*handshake.MessageIdentity); !hasIdentity {
+		if h, hasIdentity := msgs[handshake.TypeIdentity].(*handshake.MessageIdentity); !hasIdentity || len(h.IdentityData) == 0 {
 			cfg.log.Error("Identity verify failed!")
 			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoIdentity}, errInvalidIdentity
 		} else {
@@ -60,13 +58,14 @@ func flight4Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		state.PeerCertificates = h.Certificate
 	}
 
+	// NOTE: Client Cert Verify: 在DTLShps中，永远不会接收到CertificateVerify数据包，因此不需要对证书验证部分代码逻辑进行修改
+	// 这里，1. 验证CertificateVerify消息；2. 验证client证书
 	if h, hasCertVerify := msgs[handshake.TypeCertificateVerify].(*handshake.MessageCertificateVerify); hasCertVerify {
 		if state.PeerCertificates == nil {
 			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.NoCertificate}, errCertificateVerifyNoCertificate
 		}
 
-		// TODO Client Cert Verify
-		plainText := cache.pullAndMerge(
+		plainText := cache.pullAndMerge(cfg.DTLShps,
 			handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
 			handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
 			handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, false, false},
@@ -116,8 +115,7 @@ func flight4Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		var err error
 		var preMasterSecret []byte
 		if cfg.DTLShps {
-			fmt.Println("server use DTLShps")
-			fmt.Printf("state.preMasterSecret: %x\n", state.preMasterSecret)
+			fmt.Println("server use DTLShps protocol")
 			preMasterSecret = state.preMasterSecret
 		} else if cfg.localPSKCallback != nil {
 			var psk []byte
@@ -135,7 +133,7 @@ func flight4Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 
 		if state.extendedMasterSecret {
 			var sessionHash []byte
-			sessionHash, err = cache.sessionHash(state.cipherSuite.HashFunc(), cfg.initialEpoch)
+			sessionHash, err = cache.sessionHash(cfg.DTLShps, state.cipherSuite.HashFunc(), cfg.initialEpoch)
 			if err != nil {
 				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
 			}
@@ -144,13 +142,15 @@ func flight4Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 			if err != nil {
 				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
 			}
-			fmt.Printf("sessionHash: %x\n", sessionHash)
-			fmt.Printf("masterSecret: %x\n", state.masterSecret)
+			cfg.log.Tracef("preMasterSecret: %x\n", preMasterSecret)
+			cfg.log.Tracef("sessionHash: %x\n", sessionHash)
+			cfg.log.Tracef("masterSecret: %x\n", state.masterSecret)
 		} else {
 			state.masterSecret, err = prf.MasterSecret(preMasterSecret, clientRandom[:], serverRandom[:], state.cipherSuite.HashFunc())
 			if err != nil {
 				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
 			}
+			cfg.log.Tracef("masterSecret: %x\n", state.masterSecret)
 		}
 
 		if err := state.cipherSuite.Init(state.masterSecret, clientRandom[:], serverRandom[:], false); err != nil {
@@ -173,15 +173,45 @@ func flight4Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 	}
 	state.handshakeRecvSequence = seq
 
-	if _, ok = msgs[handshake.TypeFinished].(*handshake.MessageFinished); !ok {
+	var finished *handshake.MessageFinished
+	if finished, ok = msgs[handshake.TypeFinished].(*handshake.MessageFinished); !ok {
 		return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, nil
+	}
+	// NOTE: 比对 client Finish Verify
+	var plainText []byte
+	if cfg.DTLShps {
+		plainText = cache.pullAndMerge(cfg.DTLShps,
+			handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeServerHelloDone, cfg.initialEpoch, false, false},
+		)
+	} else {
+		plainText = cache.pullAndMerge(cfg.DTLShps,
+			handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
+			handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeServerKeyExchange, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeServerHelloDone, cfg.initialEpoch, false, false},
+			// flight5: append(plainText, merged...) 注意：merge了下面三条消息
+			handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, true, false},
+			handshakeCachePullRule{handshake.TypeClientKeyExchange, cfg.initialEpoch, true, false},
+			handshakeCachePullRule{handshake.TypeCertificateVerify, cfg.initialEpoch, true, false},
+		)
+	}
+	expectedVerifyData, err := prf.VerifyDataClient(state.masterSecret, plainText, state.cipherSuite.HashFunc())
+	if err != nil {
+		return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
+	}
+	if !bytes.Equal(expectedVerifyData, finished.VerifyData) {
+		return 0, &alert.Alert{Level: alert.Fatal, Description: alert.HandshakeFailure}, errVerifyDataMismatch
 	}
 
 	if state.cipherSuite.AuthenticationType() == CipherSuiteAuthenticationTypeAnonymous {
 		return flight6, nil, nil
 	}
 
-	// TODO clientAuth verify
+	// NOTE: clientAuth verify: DTLShps不在client/server端进行证书验证
 	if !cfg.DTLShps {
 		switch cfg.clientAuth {
 		case RequireAnyClientCert:
@@ -277,21 +307,20 @@ func flight4Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 			})
 		}
 
-		if cfg.clientAuth > NoClientCert {
-			pkts = append(pkts, &packet{
-				record: &recordlayer.RecordLayer{
-					Header: recordlayer.Header{
-						Version: protocol.Version1_2,
-					},
-					Content: &handshake.Handshake{
-						Message: &handshake.MessageCertificateRequest{
-							CertificateTypes:        []clientcertificate.Type{clientcertificate.RSASign, clientcertificate.ECDSASign},
-							SignatureHashAlgorithms: cfg.localSignatureSchemes,
-						},
+		// NOTE: DTLShps永远都发送MessageCertificateRequest（不关注cfg.clientAuth的状态）
+		pkts = append(pkts, &packet{
+			record: &recordlayer.RecordLayer{
+				Header: recordlayer.Header{
+					Version: protocol.Version1_2,
+				},
+				Content: &handshake.Handshake{
+					Message: &handshake.MessageCertificateRequest{
+						CertificateTypes:        []clientcertificate.Type{clientcertificate.RSASign, clientcertificate.ECDSASign},
+						SignatureHashAlgorithms: cfg.localSignatureSchemes,
 					},
 				},
-			})
-		}
+			},
+		})
 
 		if cfg.TestWithoutController {
 			// send DTLShps packets without controller

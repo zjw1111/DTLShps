@@ -55,13 +55,29 @@ func (h *handshakeCache) push(data []byte, epoch, messageSequence uint16, typ ha
 // returns a list handshakes that match the requested rules
 // the list will contain null entries for rules that can't be satisfied
 // multiple entries may match a rule, but only the last match is returned (ie ClientHello with cookies)
-func (h *handshakeCache) pull(rules ...handshakeCachePullRule) []*handshakeCacheItem {
+func (h *handshakeCache) pull(isDTLShps bool, rules ...handshakeCachePullRule) []*handshakeCacheItem {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	out := make([]*handshakeCacheItem, len(rules))
 	for i, r := range rules {
 		for _, c := range h.cache {
+			// In DTLShps, controller may add or remove packets in handshake, so the messageSequence
+			// maybe different from client and server. But, when calculate hash value, we need client
+			// and server have the same data, include the same messageSequence.
+			// 
+			// Now, we change ALL messageSequence to 0x0000. Attention: Because variable `c` is the
+			// pointer of handshakeCacheItem, this will change the messageSequence in handshakeCache.
+			// This will not affect the final handshake process, because when we calculate the hash
+			// value, we no longer need the real messageSequence of the packets.
+			//
+			// FIXME: We can add an option in the flight processing method to identify at which packet
+			// the messageSequence should be increased or decreased, making the messageSequence in the
+			// client and server consistent.
+			if isDTLShps {
+				c.data[4] = 0x00
+				c.data[5] = 0x00
+			}
 			if c.typ == r.typ && c.isClient == r.isClient && c.epoch == r.epoch {
 				switch {
 				case out[i] == nil:
@@ -123,10 +139,10 @@ func (h *handshakeCache) fullPullMap(startSeq int, rules ...handshakeCachePullRu
 }
 
 // pullAndMerge calls pull and then merges the results, ignoring any null entries
-func (h *handshakeCache) pullAndMerge(rules ...handshakeCachePullRule) []byte {
+func (h *handshakeCache) pullAndMerge(isDTLShps bool, rules ...handshakeCachePullRule) []byte {
 	merged := []byte{}
 
-	for _, p := range h.pull(rules...) {
+	for _, p := range h.pull(isDTLShps, rules...) {
 		if p != nil {
 			merged = append(merged, p.data...)
 		}
@@ -143,13 +159,13 @@ func (h *handshakeCache) sessionHash(isDTLShps bool, hf prf.HashFunc, epoch uint
 	// NOTE: extendedMasterSecret hash calc
 	var handshakeBuffer []*handshakeCacheItem
 	if isDTLShps {
-		handshakeBuffer = h.pull(
+		handshakeBuffer = h.pull(isDTLShps,
 			handshakeCachePullRule{handshake.TypeServerHello, epoch, false, false},
 			handshakeCachePullRule{handshake.TypeCertificateRequest, epoch, false, false},
 			handshakeCachePullRule{handshake.TypeServerHelloDone, epoch, false, false},
 		)
 	} else {
-		handshakeBuffer = h.pull(
+		handshakeBuffer = h.pull(isDTLShps,
 			handshakeCachePullRule{handshake.TypeClientHello, epoch, true, false},
 			handshakeCachePullRule{handshake.TypeServerHello, epoch, false, false},
 			handshakeCachePullRule{handshake.TypeCertificate, epoch, false, false},

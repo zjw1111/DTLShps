@@ -117,7 +117,7 @@ func TestHandshakeCacheSinglePush(t *testing.T) {
 		for _, i := range test.Input {
 			h.push(i.data, i.epoch, i.messageSequence, i.typ, i.isClient)
 		}
-		verifyData := h.pullAndMerge(test.Rule...)
+		verifyData := h.pullAndMerge(false, test.Rule...)
 		if !bytes.Equal(verifyData, test.Expected) {
 			t.Errorf("handshakeCache '%s' exp: % 02x actual % 02x", test.Name, test.Expected, verifyData)
 		}

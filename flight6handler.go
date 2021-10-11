@@ -40,18 +40,18 @@ func flight6Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 			},
 		})
 
-	// NOTE 发送 server Finish Verify
+	// NOTE: 发送 server Finish Verify
 	if len(state.localVerifyData) == 0 {
 		var plainText []byte
 		if cfg.DTLShps {
-			plainText = cache.pullAndMerge(
+			plainText = cache.pullAndMerge(cfg.DTLShps,
 				handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
 				handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, false},
 				handshakeCachePullRule{handshake.TypeServerHelloDone, cfg.initialEpoch, false, false},
 				handshakeCachePullRule{handshake.TypeFinished, cfg.initialEpoch + 1, true, false},
 			)
 		} else {
-			plainText = cache.pullAndMerge(
+			plainText = cache.pullAndMerge(cfg.DTLShps,
 				handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
 				handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
 				handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, false, false},
@@ -86,7 +86,7 @@ func flight6Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 				},
 			},
 			// when use controller, the controller will send one more message, so MessageSequence needs to add one
-			addOneMessageSequence:    !cfg.TestWithoutController,
+			addOneMessageSequence:    cfg.DTLShps && !cfg.TestWithoutController,
 			shouldEncrypt:            true,
 			resetLocalSequenceNumber: true,
 		},

@@ -28,19 +28,29 @@ func flight5Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 	if finished, ok = msgs[handshake.TypeFinished].(*handshake.MessageFinished); !ok {
 		return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, nil
 	}
-	// TODO Verify
-	plainText := cache.pullAndMerge(
-		handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
-		handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
-		handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, false, false},
-		handshakeCachePullRule{handshake.TypeServerKeyExchange, cfg.initialEpoch, false, false},
-		handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, false},
-		handshakeCachePullRule{handshake.TypeServerHelloDone, cfg.initialEpoch, false, false},
-		handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, true, false},
-		handshakeCachePullRule{handshake.TypeClientKeyExchange, cfg.initialEpoch, true, false},
-		handshakeCachePullRule{handshake.TypeCertificateVerify, cfg.initialEpoch, true, false},
-		handshakeCachePullRule{handshake.TypeFinished, cfg.initialEpoch + 1, true, false},
-	)
+	// NOTE: 比对 server Finish Verify
+	var plainText []byte
+	if cfg.DTLShps {
+		plainText = cache.pullAndMerge(cfg.DTLShps,
+			handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeServerHelloDone, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeFinished, cfg.initialEpoch + 1, true, false},
+		)
+	} else {
+		plainText = cache.pullAndMerge(cfg.DTLShps,
+			handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
+			handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeServerKeyExchange, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeServerHelloDone, cfg.initialEpoch, false, false},
+			handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, true, false},
+			handshakeCachePullRule{handshake.TypeClientKeyExchange, cfg.initialEpoch, true, false},
+			handshakeCachePullRule{handshake.TypeCertificateVerify, cfg.initialEpoch, true, false},
+			handshakeCachePullRule{handshake.TypeFinished, cfg.initialEpoch + 1, true, false},
+		)
+	}
 
 	expectedVerifyData, err := prf.VerifyDataServer(state.masterSecret, plainText, state.cipherSuite.HashFunc())
 	if err != nil {
@@ -104,14 +114,13 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 		})
 	}
 
-	serverKeyExchangeData := cache.pullAndMerge(
+	serverKeyExchangeData := cache.pullAndMerge(cfg.DTLShps,
 		handshakeCachePullRule{handshake.TypeServerKeyExchange, cfg.initialEpoch, false, false},
 	)
 
 	serverKeyExchange := &handshake.MessageServerKeyExchange{}
 
 	// handshakeMessageServerKeyExchange is optional for PSK
-	// TODO 与flight4 L120意思差不多，生成一个空的message
 	if len(serverKeyExchangeData) == 0 {
 		alertPtr, err := handleServerKeyExchange(c, state, cfg, &handshake.MessageServerKeyExchange{})
 		if err != nil {
@@ -156,9 +165,10 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 	// If the client has sent a certificate with signing ability, a digitally-signed
 	// CertificateVerify message is sent to explicitly verify possession of the
 	// private key in the certificate.
-	// TODO Client Cert Verify
-	if state.remoteRequestedCertificate && len(cfg.localCertificates) > 0 {
-		plainText := append(cache.pullAndMerge(
+	// FIXME 发送Client Cert Verify消息
+	if !cfg.TestWithoutController && state.remoteRequestedCertificate && len(cfg.localCertificates) > 0 {
+		// send DTLShps packets with controller or just normal DTLS packets
+		plainText := append(cache.pullAndMerge(cfg.DTLShps,
 			handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
 			handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
 			handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, false, false},
@@ -170,7 +180,6 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 		), merged...)
 
 		// Find compatible signature scheme
-		// XXX check!
 		signatureHashAlgo, err := signaturehash.SelectSignatureScheme(cfg.localSignatureSchemes, privateKey)
 		if err != nil {
 			return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InsufficientSecurity}, err
@@ -182,36 +191,33 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 		}
 		state.localCertificatesVerify = certVerify
 
-		if !cfg.TestWithoutController {
-			// send DTLShps packets with controller or just normal DTLS packets
-			p := &packet{
-				record: &recordlayer.RecordLayer{
-					Header: recordlayer.Header{
-						Version: protocol.Version1_2,
-					},
-					Content: &handshake.Handshake{
-						Message: &handshake.MessageCertificateVerify{
-							HashAlgorithm:      signatureHashAlgo.Hash,
-							SignatureAlgorithm: signatureHashAlgo.Signature,
-							Signature:          state.localCertificatesVerify,
-						},
+		p := &packet{
+			record: &recordlayer.RecordLayer{
+				Header: recordlayer.Header{
+					Version: protocol.Version1_2,
+				},
+				Content: &handshake.Handshake{
+					Message: &handshake.MessageCertificateVerify{
+						HashAlgorithm:      signatureHashAlgo.Hash,
+						SignatureAlgorithm: signatureHashAlgo.Signature,
+						Signature:          state.localCertificatesVerify,
 					},
 				},
-			}
-			pkts = append(pkts, p)
-
-			h, ok := p.record.Content.(*handshake.Handshake)
-			if !ok {
-				return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, errInvalidContentType
-			}
-			h.Header.MessageSequence = seqPred
-			// seqPred++ // this is the last use of seqPred
-			raw, err := h.Marshal()
-			if err != nil {
-				return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
-			}
-			merged = append(merged, raw...)
+			},
 		}
+		pkts = append(pkts, p)
+
+		h, ok := p.record.Content.(*handshake.Handshake)
+		if !ok {
+			return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, errInvalidContentType
+		}
+		h.Header.MessageSequence = seqPred
+		// seqPred++ // this is the last use of seqPred
+		raw, err := h.Marshal()
+		if err != nil {
+			return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
+		}
+		merged = append(merged, raw...)
 	}
 
 	if cfg.TestWithoutController && cfg.DTLShps {
@@ -238,23 +244,36 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 			Content: &protocol.ChangeCipherSpec{},
 		},
 	})
-	// TODO verify
+	// NOTE: 发送 client Finish Verify
 	if len(state.localVerifyData) == 0 {
-		plainText := cache.pullAndMerge(
-			handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
-			handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
-			handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, false, false},
-			handshakeCachePullRule{handshake.TypeServerKeyExchange, cfg.initialEpoch, false, false},
-			handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, false},
-			handshakeCachePullRule{handshake.TypeServerHelloDone, cfg.initialEpoch, false, false},
-			handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, true, false},
-			handshakeCachePullRule{handshake.TypeClientKeyExchange, cfg.initialEpoch, true, false},
-			handshakeCachePullRule{handshake.TypeCertificateVerify, cfg.initialEpoch, true, false},
-			handshakeCachePullRule{handshake.TypeFinished, cfg.initialEpoch + 1, true, false},
-		)
+		var plainText []byte
+		if cfg.DTLShps {
+			plainText = cache.pullAndMerge(cfg.DTLShps,
+				handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
+				handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, false},
+				handshakeCachePullRule{handshake.TypeServerHelloDone, cfg.initialEpoch, false, false},
+			)
+		} else {
+			plainText = cache.pullAndMerge(cfg.DTLShps,
+				handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
+				handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
+				handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, false, false},
+				handshakeCachePullRule{handshake.TypeServerKeyExchange, cfg.initialEpoch, false, false},
+				handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, false},
+				handshakeCachePullRule{handshake.TypeServerHelloDone, cfg.initialEpoch, false, false},
+				// 在 append(plainText, merged...) merge了下面三条消息
+				// handshakeCachePullRule{handshake.TypeCertificate, cfg.initialEpoch, true, false},
+				// handshakeCachePullRule{handshake.TypeClientKeyExchange, cfg.initialEpoch, true, false},
+				// handshakeCachePullRule{handshake.TypeCertificateVerify, cfg.initialEpoch, true, false},
+			)
+		}
 
 		var err error
-		state.localVerifyData, err = prf.VerifyDataClient(state.masterSecret, append(plainText, merged...), state.cipherSuite.HashFunc())
+		if cfg.DTLShps {
+			state.localVerifyData, err = prf.VerifyDataClient(state.masterSecret, plainText, state.cipherSuite.HashFunc())
+		} else {
+			state.localVerifyData, err = prf.VerifyDataClient(state.masterSecret, append(plainText, merged...), state.cipherSuite.HashFunc())
+		}
 		if err != nil {
 			return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
 		}
@@ -292,7 +311,7 @@ func initalizeCipherSuite(state *State, cache *handshakeCache, cfg *handshakeCon
 
 	if state.extendedMasterSecret {
 		var sessionHash []byte
-		sessionHash, err = cache.sessionHash(state.cipherSuite.HashFunc(), cfg.initialEpoch, sendingPlainText)
+		sessionHash, err = cache.sessionHash(cfg.DTLShps, state.cipherSuite.HashFunc(), cfg.initialEpoch, sendingPlainText)
 		if err != nil {
 			return &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
 		}
@@ -301,14 +320,18 @@ func initalizeCipherSuite(state *State, cache *handshakeCache, cfg *handshakeCon
 		if err != nil {
 			return &alert.Alert{Level: alert.Fatal, Description: alert.IllegalParameter}, err
 		}
+		cfg.log.Tracef("preMasterSecret: %x\n", state.preMasterSecret)
+		cfg.log.Tracef("sessionHash: %x\n", sessionHash)
+		cfg.log.Tracef("masterSecret: %x\n", state.masterSecret)
 	} else {
 		state.masterSecret, err = prf.MasterSecret(state.preMasterSecret, clientRandom[:], serverRandom[:], state.cipherSuite.HashFunc())
 		if err != nil {
 			return &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
 		}
+		cfg.log.Tracef("masterSecret: %x\n", state.masterSecret)
 	}
 
-	// TODO cert verify
+	// FIXME server cert verify
 	if !cfg.DTLShps && state.cipherSuite.AuthenticationType() == CipherSuiteAuthenticationTypeCertificate {
 		// Verify that the pair of hash algorithm and signiture is listed.
 		var validSignatureScheme bool
@@ -344,6 +367,7 @@ func initalizeCipherSuite(state *State, cache *handshakeCache, cfg *handshakeCon
 	}
 
 	cfg.writeKeyLog(keyLogLabelTLS12, clientRandom[:], state.masterSecret)
+	cfg.log.Tracef("keylog: %s %x %x", keyLogLabelTLS12, clientRandom[:], state.masterSecret)
 
 	return nil, nil
 }

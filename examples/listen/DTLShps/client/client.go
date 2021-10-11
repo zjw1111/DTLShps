@@ -70,7 +70,7 @@ func main() {
 			return []byte("ABCDEF"), nil
 		},
 		// CipherSuites:         []dtls.CipherSuiteID{dtls.TLS_PSK_WITH_AES_128_GCM_SHA256},
-		ExtendedMasterSecret:  dtls.DisableExtendedMasterSecret,
+		ExtendedMasterSecret:  dtls.RequireExtendedMasterSecret,
 		DTLShps:               true,
 		TestWithoutController: testWithoutController,
 		SkipHelloVerify:       skipHelloVerify,

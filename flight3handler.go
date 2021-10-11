@@ -40,8 +40,6 @@ func flight3Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		seq, msgs, ok = cache.fullPullMap(state.handshakeRecvSequence,
 			handshakeCachePullRule{handshake.TypeServerHello, cfg.initialEpoch, false, false},
 			handshakeCachePullRule{handshake.TypeCertificateRequest, cfg.initialEpoch, false, false},
-			// BUG?: If the Identity message is empty(optional), it means that the controller did not
-			// send the Identity message, that is, the certificate verification failed
 			handshakeCachePullRule{handshake.TypeIdentity, cfg.initialEpoch, false, false},
 			handshakeCachePullRule{handshake.TypeEncryptedKey, cfg.initialEpoch, false, false},
 			handshakeCachePullRule{handshake.TypeServerHelloDone, cfg.initialEpoch, false, false},
@@ -150,8 +148,7 @@ func flight3Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 func handleServerKeyExchange(_ flightConn, state *State, cfg *handshakeConfig, h *handshake.MessageServerKeyExchange) (*alert.Alert, error) {
 	var err error
 	if cfg.DTLShps {
-		fmt.Println("client use DTLShps")
-		fmt.Printf("state.preMasterSecret: %x\n", state.preMasterSecret)
+		fmt.Println("client use DTLShps protocol")
 	} else if cfg.localPSKCallback != nil {
 		var psk []byte
 		if psk, err = cfg.localPSKCallback(h.IdentityHint); err != nil {
