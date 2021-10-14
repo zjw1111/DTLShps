@@ -1,6 +1,4 @@
 #!/bin/bash
-mkdir -p cert
-cd cert
 
 # RootCA
 openssl genrsa -out root.key

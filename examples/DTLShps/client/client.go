@@ -54,10 +54,10 @@ func main() {
 	//
 
 	startTime := time.Now()
-	certificate, err := util.LoadKeyAndCertificate("../verify/cert/client.pem", "../verify/cert/client.pub.crt")
+	certificate, err := util.LoadKeyAndCertificate("../certificates/client.pem", "../certificates/client.pub.crt")
 	util.Check(err)
 
-	rootCertificate, err := util.LoadCertificate("../verify/cert/CA.crt")
+	rootCertificate, err := util.LoadCertificate("../certificates/CA.crt")
 	util.Check(err)
 	certPool := x509.NewCertPool()
 	cert, err := x509.ParseCertificate(rootCertificate.Certificate[0])

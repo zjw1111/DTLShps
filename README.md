@@ -39,11 +39,13 @@ Then, you need to run the server and client. You can use parameter `-h` or `--he
 In particular, you can use parameter `-t` to send the DTLShps packets without the controller and run the DTLShps server and client for test.
 
 ```sh
-go run examples/listen/DTLShps/server/main.go
+cd examples/DTLShps
+go run server/server.go
 ```
 
 ```sh
-go run examples/listen/DTLShps/client/main.go
+cd examples/DTLShps
+go run client/client.go
 ```
 
 ## The ORIGIN README
