@@ -53,6 +53,7 @@ func main() {
 	// Everything below is the pion-DTLS API! Thanks for using it ❤️.
 	//
 
+	startTime := time.Now()
 	certificate, err := util.LoadKeyAndCertificate("../verify/cert/client.pem", "../verify/cert/client.pub.crt")
 	util.Check(err)
 
@@ -66,7 +67,6 @@ func main() {
 	// Prepare the configuration of the DTLS connection
 	config := &dtls.Config{
 		PSK: func(hint []byte) ([]byte, error) {
-			fmt.Printf("Server's hint: %s \n", hint)
 			return []byte("ABCDEF"), nil
 		},
 		// CipherSuites:         []dtls.CipherSuiteID{dtls.TLS_PSK_WITH_AES_128_GCM_SHA256},
@@ -83,12 +83,16 @@ func main() {
 	// Connect to a DTLS server
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	startTimeBeforeDial := time.Now()
 	dtlsConn, err := dtls.DialWithContext(ctx, "udp", addr, config)
+	finishTime := time.Now()
 	util.Check(err)
 	defer func() {
 		util.Check(dtlsConn.Close())
 	}()
 
+	fmt.Printf("Total time use: %d microseconds\n", finishTime.Sub(startTime).Microseconds())
+	fmt.Printf("Handshake time use: %d microseconds\n", finishTime.Sub(startTimeBeforeDial).Microseconds())
 	fmt.Println("Connected; type 'exit' to shutdown gracefully")
 
 	// Simulate a chat session

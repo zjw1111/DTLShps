@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
-	"fmt"
 
 	"github.com/zjw1111/DTLShps/pkg/crypto/prf"
 	"github.com/zjw1111/DTLShps/pkg/crypto/signaturehash"
@@ -28,7 +27,7 @@ func flight5Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 	if finished, ok = msgs[handshake.TypeFinished].(*handshake.MessageFinished); !ok {
 		return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, nil
 	}
-	// NOTE: 比对 server Finish Verify
+	// NOTE: 比对 server Finish
 	var plainText []byte
 	if cfg.DTLShps {
 		plainText = cache.pullAndMerge(cfg.DTLShps,
@@ -165,7 +164,7 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 	// If the client has sent a certificate with signing ability, a digitally-signed
 	// CertificateVerify message is sent to explicitly verify possession of the
 	// private key in the certificate.
-	// FIXME 发送Client Cert Verify消息
+	// NOTE: 发送Client Cert Verify消息
 	if !cfg.TestWithoutController && state.remoteRequestedCertificate && len(cfg.localCertificates) > 0 {
 		// send DTLShps packets with controller or just normal DTLS packets
 		plainText := append(cache.pullAndMerge(cfg.DTLShps,
@@ -244,7 +243,7 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 			Content: &protocol.ChangeCipherSpec{},
 		},
 	})
-	// NOTE: 发送 client Finish Verify
+	// NOTE: 发送 client Finish
 	if len(state.localVerifyData) == 0 {
 		var plainText []byte
 		if cfg.DTLShps {
@@ -278,7 +277,6 @@ func flight5Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 			return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
 		}
 	}
-	fmt.Printf("state.localVerifyData: %x\n", state.localVerifyData)
 
 	pkts = append(pkts, &packet{
 		record: &recordlayer.RecordLayer{
@@ -331,7 +329,7 @@ func initalizeCipherSuite(state *State, cache *handshakeCache, cfg *handshakeCon
 		cfg.log.Tracef("masterSecret: %x\n", state.masterSecret)
 	}
 
-	// FIXME server cert verify
+	// NOTE: server cert 验证
 	if !cfg.DTLShps && state.cipherSuite.AuthenticationType() == CipherSuiteAuthenticationTypeCertificate {
 		// Verify that the pair of hash algorithm and signiture is listed.
 		var validSignatureScheme bool

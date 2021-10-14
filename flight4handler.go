@@ -177,7 +177,7 @@ func flight4Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 	if finished, ok = msgs[handshake.TypeFinished].(*handshake.MessageFinished); !ok {
 		return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, nil
 	}
-	// NOTE: 比对 client Finish Verify
+	// NOTE: 比对 client Finish
 	var plainText []byte
 	if cfg.DTLShps {
 		plainText = cache.pullAndMerge(cfg.DTLShps,
@@ -211,7 +211,7 @@ func flight4Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		return flight6, nil, nil
 	}
 
-	// NOTE: clientAuth verify: DTLShps不在client/server端进行证书验证
+	// NOTE: clientAuth 验证: DTLShps不在client/server端进行证书验证
 	if !cfg.DTLShps {
 		switch cfg.clientAuth {
 		case RequireAnyClientCert:
@@ -252,7 +252,6 @@ func flight4Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 			ProtectionProfiles: []SRTPProtectionProfile{state.srtpProtectionProfile},
 		})
 	}
-	// TODO
 	if state.cipherSuite.AuthenticationType() == CipherSuiteAuthenticationTypeCertificate {
 		extensions = append(extensions, []extension.Extension{
 			&extension.SupportedEllipticCurves{

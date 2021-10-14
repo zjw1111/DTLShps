@@ -40,7 +40,7 @@ func flight6Generate(c flightConn, state *State, cache *handshakeCache, cfg *han
 			},
 		})
 
-	// NOTE: 发送 server Finish Verify
+	// NOTE: 发送 server Finish
 	if len(state.localVerifyData) == 0 {
 		var plainText []byte
 		if cfg.DTLShps {

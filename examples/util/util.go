@@ -45,6 +45,9 @@ func Chat(conn io.ReadWriter) {
 
 	for {
 		text, err := reader.ReadString('\n')
+		if err == io.EOF {
+			return
+		}
 		Check(err)
 
 		if strings.TrimSpace(text) == "exit" {
@@ -70,10 +73,10 @@ func Check(err error) {
 			return
 		}
 
-		fmt.Printf("net.Error: %v\n", err)
+		fmt.Print("net.Error: ")
 		panic(err)
 	default:
-		fmt.Printf("error: %v\n", err)
+		fmt.Print("error: ")
 		panic(err)
 	}
 }

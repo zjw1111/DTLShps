@@ -70,7 +70,6 @@ func main() {
 	// Prepare the configuration of the DTLS connection
 	config := &dtls.Config{
 		PSK: func(hint []byte) ([]byte, error) {
-			fmt.Printf("Client's hint: %s \n", hint)
 			return []byte("ABCDEF"), nil
 		},
 		// CipherSuites:         []dtls.CipherSuiteID{dtls.TLS_PSK_WITH_AES_128_GCM_SHA256},

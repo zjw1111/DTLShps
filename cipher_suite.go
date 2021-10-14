@@ -176,7 +176,7 @@ func parseCipherSuites(userSelectedSuites []CipherSuiteID, customCipherSuites fu
 			return nil, err
 		}
 	} else {
-		cipherSuites = defaultCipherSuites()
+		cipherSuites = allCipherSuites()
 	}
 
 	// Put CustomCipherSuites before ID selected suites
