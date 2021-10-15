@@ -72,7 +72,7 @@ func main() {
 		PSK: func(hint []byte) ([]byte, error) {
 			return []byte("ABCDEF"), nil
 		},
-		// CipherSuites:         []dtls.CipherSuiteID{dtls.TLS_PSK_WITH_AES_128_GCM_SHA256},
+		CipherSuites:          []dtls.CipherSuiteID{dtls.TLS_ECDHE_ECDSA_WITH_AES_128_CCM, dtls.TLS_PSK_WITH_AES_128_GCM_SHA256},
 		ExtendedMasterSecret:  dtls.RequireExtendedMasterSecret,
 		DTLShps:               true,
 		TestWithoutController: testWithoutController,

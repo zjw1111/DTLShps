@@ -1,11 +1,6 @@
-FROM golang:1.14-alpine3.11
+FROM golang:buster
 
-RUN apk add --no-cache \
-  openssl
-
-ENV CGO_ENABLED=0
-
-COPY . /go/src/github.com/pion/dtls
-WORKDIR /go/src/github.com/pion/dtls/e2e
+COPY . /go/src/github.com/zjw1111/DTLShps
+WORKDIR /go/src/github.com/zjw1111/DTLShps/e2e
 
 CMD ["go", "test", "-tags=openssl", "-v", "."]

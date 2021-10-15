@@ -117,7 +117,7 @@ func flight4Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		if cfg.DTLShps {
 			fmt.Println("server use DTLShps protocol")
 			preMasterSecret = state.preMasterSecret
-		} else if cfg.localPSKCallback != nil {
+		} else if state.cipherSuite.AuthenticationType() == CipherSuiteAuthenticationTypePreSharedKey {
 			var psk []byte
 			if psk, err = cfg.localPSKCallback(clientKeyExchange.IdentityHint); err != nil {
 				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err

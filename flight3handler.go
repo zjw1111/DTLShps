@@ -154,7 +154,6 @@ func handleServerKeyExchange(_ flightConn, state *State, cfg *handshakeConfig, h
 		if psk, err = cfg.localPSKCallback(h.IdentityHint); err != nil {
 			return &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
 		}
-		fmt.Printf("psk: %x\n", psk)
 		state.IdentityHint = h.IdentityHint
 		state.preMasterSecret = prf.PSKPreMasterSecret(psk)
 	} else {
