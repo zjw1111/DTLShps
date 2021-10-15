@@ -28,6 +28,13 @@ The code of the controller part was completed by Ye Lingyun, which is not open s
 
 ## What I do
 - define the format of new messages
+    - Handshake messages types: \
+    **MESSAGE FORMAT**: one byte for length and some bytes for message
+        - EncryptedKey - 31
+        - Identity - 32
+    - Alert types:
+        - NoEncryptedKey - 101
+        - NoIdentity - 102
 - modify the cipher suite method and flight generation and parse method
 - implement a DTLShps example program
 
