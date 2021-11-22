@@ -1,4 +1,5 @@
 # DTLShps [![DTLShps](https://img.shields.io/badge/zjw1111-DTLShps-gray.svg?longCache=true&colorB=brightgreen)][Zhang_Jiawei] [![LICENSE](https://img.shields.io/badge/license-AGPL3.0-yellow.svg)](LICENSE) [![Go Reference](https://pkg.go.dev/badge/github.com/zjw1111/DTLShps.svg)](https://pkg.go.dev/github.com/zjw1111/DTLShps)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fzjw1111%2FDTLShps.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fzjw1111%2FDTLShps?ref=badge_shield)
 
 This is a simple implement and verification of DTLShps protocol based on **[pion/dtls][pion/dtls]** and **[DTLShps: SDN-based DTLS handshake protocol simplification for IoT][DTLShps]**
 
@@ -7,6 +8,9 @@ This is a simple implement and verification of DTLShps protocol based on **[pion
 
 ## License
 GNU AGPL3.0 License - see [LICENSE](LICENSE) for full text
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fzjw1111%2FDTLShps.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fzjw1111%2FDTLShps?ref=badge_large)
 
 ### **Note!!**
 This project uses GNU AGPL3.0 LICENSE. If you copy the source code and use it for secondary creation (such as **copying or modifying the code for submitting the homework in college**, etc.), you need to mark the original author's information and mark the modification of the code. For more information, please see the [`LICENSE`](LICENSE) file. If you want to use the code in academic research, please contact me by GitHub issue.
@@ -184,4 +188,4 @@ I fork the repo based on the version of [pion/dtls#9610016](https://github.com/p
 > 
 > ### License
 > MIT License - see [LICENSE](LICENSE) for full text
-> 
+>
